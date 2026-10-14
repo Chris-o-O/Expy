@@ -190,6 +190,20 @@ h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacin
 .catrow .lim { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
 .catrow .lim.over { color: var(--bad); font-weight: 600; }
 
+/* Wishes */
+.wish { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 12px 14px; border-top: 1px solid var(--line); align-items: center; }
+.list > li:first-child .wish { border-top: 0; }
+.wish .w-main { border: 0; background: transparent; text-align: left; padding: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wish .w-name { font-weight: 700; overflow-wrap: anywhere; }
+.view > p { margin: 0; }
+.wish .w-when { font-size: 13px; color: var(--muted); }
+.wish .w-when b { color: var(--fg); font-weight: 650; }
+.wish .w-when.now b { color: var(--ok); }
+.wish .w-when.never b { color: var(--bad); }
+.wish .w-side { display: flex; align-items: center; gap: 2px; }
+.wish .w-price { font-weight: 720; margin-right: 6px; }
+.rate .v { font-size: 26px; font-weight: 780; font-stretch: 114%; letter-spacing: -.02em; }
+
 /* Settings */
 .set-row { display: grid; grid-template-columns: 1fr 120px; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
 .set-row:first-child { border-top: 0; }
@@ -209,7 +223,7 @@ h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacin
 
 /* Tab bar */
 .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
-.tabs-in { max-width: 520px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); height: var(--nav-h); }
+.tabs-in { max-width: 520px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); height: var(--nav-h); }
 .tabs button { border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .tabs button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .tabs button[aria-current="page"] { color: var(--accent); }
@@ -260,6 +274,7 @@ h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacin
     <div id="recent"></div>
   </section>
   <section id="v-debts" class="view" hidden></section>
+  <section id="v-wishes" class="view" hidden></section>
   <section id="v-stats" class="view" hidden></section>
   <section id="v-settings" class="view" hidden></section>
 </div>
@@ -268,6 +283,7 @@ h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacin
   <div class="tabs-in">
     <button data-act="tab" data-tab="home" aria-current="page"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Saisie</button>
     <button data-act="tab" data-tab="debts"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/></svg>Dettes</button>
+    <button data-act="tab" data-tab="wishes"><svg viewBox="0 0 24 24"><path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/></svg>Souhaits</button>
     <button data-act="tab" data-tab="stats"><svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>Stats</button>
     <button data-act="tab" data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Réglages</button>
   </div>
@@ -380,6 +396,7 @@ function defaultSettings() {
     cats: DEFAULT_CATS.map(c => Object.assign({}, c)),
     catsV: 2,
     debts: [], payments: [], debtBudget: 0, method: 'avalanche',
+    wishes: [], wishCushion: 0, wishRate: null, wishAfterDebts: false,
     alerts: {}, lastExport: null,
   };
 }
@@ -398,6 +415,7 @@ const DEFAULT_CATS = [
 function normalize(st) {
   const s = Object.assign(defaultSettings(), st || {});
   if (!Array.isArray(s.periods)) s.periods = [];
+  if (!Array.isArray(s.wishes)) s.wishes = [];
   if (st && st.thresholds && Object.keys(st.thresholds).length && !s.periods.length) {
     const th = st.thresholds, cm = curMonth();
     const keys = Object.keys(th).filter(k => k <= cm).sort();
@@ -510,6 +528,13 @@ function overlapOf(start, end, exceptId) {
   return S.settings.periods.find(p => p.id !== exceptId && p.start <= end && start <= p.end) || null;
 }
 const itemsIn = (p) => allItems().filter(i => { const d = dayOfItem(i); return d >= p.start && d <= p.end; });
+// First day of tracking: the earliest budget period start or expense date. Stats never go before it.
+function trackingStart() {
+  const c = [];
+  if (S.settings.periods.length) c.push(S.settings.periods.map(p => p.start).sort()[0]);
+  const its = allItems(); if (its.length) c.push(its.map(dayOfItem).sort()[0]);
+  return c.length ? c.sort()[0] : todayISO();
+}
 const itemsOf = (mk) => S.months[mk] || [];
 const sumC = (arr) => arr.reduce((s, i) => s + i.amt, 0);
 function allItems() { return Object.values(S.months).flat(); }
@@ -649,7 +674,7 @@ function renderSummary() {
 }
 function renderBanners() {
   const out = [];
-  const hasEx = allItems().some(i => i.ex) || S.settings.debts.some(d => d.ex);
+  const hasEx = allItems().some(i => i.ex) || S.settings.debts.some(d => d.ex) || S.settings.wishes.some(w => w.ex);
   if (hasEx) out.push(`<div class="banner ex"><span>Données d'exemple affichées.</span><button class="link" data-act="clear-demo">Tout effacer</button></div>`);
   const anyData = allItems().length || S.settings.debts.length;
   if (!anyData) out.push(`<div class="banner"><span>Pour voir l'outil rempli, charge des dépenses et des dettes d'exemple.</span><button class="link" data-act="load-demo">Exemple</button></div>`);
@@ -741,16 +766,22 @@ function previewBudget(v) {
 
 /* ---------- Stats view ---------- */
 function renderStats() {
+  const start = trackingStart(), startMk = start.slice(0, 7);
+  if (UI.statsMonth < startMk) UI.statsMonth = startMk;
+  if (UI.statsMonth > curMonth()) UI.statsMonth = curMonth();
   const mk = UI.statsMonth;
   const items = itemsOf(mk).slice().sort((a, b) => b.ts.localeCompare(a.ts));
   const total = sumC(items), homeC = sumC(items.filter(i => i.home));
   const isCur = mk === curMonth();
-  const daysCounted = isCur ? new Date().getDate() : daysInMonth(parseMonth(mk));
-  // six-month chart (calendar months, independent of budget periods)
-  const ks = []; for (let i = 5; i >= 0; i--) ks.push(addMonths(mk, -i));
+  const mFirst = mk + '-01', mLast = isoOf(new Date(parseMonth(mk).getFullYear(), parseMonth(mk).getMonth() + 1, 0));
+  const from = start > mFirst ? start : mFirst, to = isCur ? todayISO() : mLast;
+  const daysCounted = Math.max(1, daysBetween(from, to) + 1);
+  // chart: up to six calendar months, never before the start of tracking
+  const ks = []; for (let i = 5; i >= 0; i--) { const k = addMonths(mk, -i); if (k >= startMk) ks.push(k); }
   const vals = ks.map(k => sumC(itemsOf(k))), ths = ks.map(() => null);
   const maxV = Math.max(1, ...vals) * 1.1;
-  const W = 340, H = 170, padL = 4, padB = 36, padT = 8, bw = 34, gap = (W - padL * 2 - bw * 6) / 5;
+  const slots = Math.max(ks.length, 3);
+  const W = 340, H = 170, padB = 36, padT = 8, bw = 34, gap = (W - 8 - bw * 6) / 5, padL = (W - (slots * bw + (slots - 1) * gap)) / 2;
   const y = (v) => padT + (H - padT - padB) * (1 - v / maxV);
   let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Total des six derniers mois">`;
   svg += `<line x1="0" x2="${W}" y1="${H - padB}" y2="${H - padB}" stroke="var(--line)" stroke-width="1"/>`;
@@ -777,9 +808,8 @@ function renderStats() {
     return `<div class="catrow"><span class="n"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:${esc(c.color)}"></span>${esc(c.name)}</span><span class="num" style="font-weight:650">${money(v)}</span>
       <span class="bar"><i style="width:${(v / scale) * 100}%;background:${esc(c.color)}"></i>${c.limit ? `<b style="left:calc(${(c.limit / scale) * 100}% - 1px)"></b>` : ''}</span>${lim}</div>`;
   }).join('');
-  const firstKey = Object.keys(S.months).filter(k => itemsOf(k).length).sort()[0] || curMonth();
   $('#v-stats').innerHTML = `
-    <div class="month-nav"><button data-act="month" data-d="-1" aria-label="Mois précédent" ${mk <= addMonths(firstKey, 0) && mk <= addMonths(curMonth(), -5) ? 'disabled' : ''}>‹</button><h1>${cap(monthLabel(mk))}</h1><button data-act="month" data-d="1" aria-label="Mois suivant" ${isCur ? 'disabled' : ''}>›</button></div>
+    <div class="month-nav"><button data-act="month" data-d="-1" aria-label="Mois précédent" ${mk <= startMk ? 'disabled' : ''}>‹</button><h1>${cap(monthLabel(mk))}</h1><button data-act="month" data-d="1" aria-label="Mois suivant" ${isCur ? 'disabled' : ''}>›</button></div>
     <div class="card">
       <div class="kv">
         <div><span class="k">Total</span><span class="v num">${money0(total)}</span></div>
@@ -787,7 +817,7 @@ function renderStats() {
         <div><span class="k">Dépenses</span><span class="v num">${items.length}</span></div>
       </div>
       ${svg}
-      <div class="note">Total par mois civil, en $. Le seuil suit tes périodes, plus bas.</div>
+      <div class="note">Total par mois civil, en $, depuis le début de ton suivi le ${esc(shortDate(start, true))}. Le seuil suit tes périodes, plus bas.</div>
     </div>
     ${periodsCard()}
     <div class="card">
@@ -795,9 +825,9 @@ function renderStats() {
       <div class="kv">
         <div><span class="k">Ce mois</span><span class="v num" style="color:var(--home)">${money0(homeC)}</span></div>
         <div><span class="k">Part</span><span class="v num">${total ? PCT.format(homeC / total) : '—'}</span></div>
-        <div><span class="k">Sur 12 mois</span><span class="v num">${money0(homeC * 12)}</span></div>
+        <div><span class="k">Sur 12 mois</span><span class="v num">${money0(homeC / daysCounted * 365)}</span></div>
       </div>
-      <div class="note">Sans ces achats, le mois serait à ${money(total - homeC)}. L'estimation annuelle multiplie ce mois par 12.</div>
+      <div class="note">Sans ces achats, le mois serait à ${money(total - homeC)}. L'estimation sur 12 mois prolonge le rythme quotidien de ce mois.</div>
     </div>
     <div class="card"><h2>Par catégorie</h2>${catRows || '<div class="note">Aucune dépense ce mois-ci.</div>'}</div>
     <h2 style="padding-top:4px">Dépenses du mois (${items.length})</h2>
@@ -824,6 +854,163 @@ function periodsCard() {
   }).join('')}</ul></div>`;
 }
 
+/* ---------- Wish list ---------- */
+// Saving capacity = what stayed under the threshold in the last finished periods (up to 6), per day.
+// A fixed monthly amount set by the user overrides it.
+function savingRate() {
+  const s = S.settings;
+  if (s.wishRate != null) return { perDay: s.wishRate / 30.4375, monthly: s.wishRate, source: 'fixed' };
+  const today = todayISO();
+  const done = s.periods.filter(p => p.end < today).sort((a, b) => b.end.localeCompare(a.end)).slice(0, 6);
+  if (!done.length) return { perDay: null, monthly: null, source: 'none' };
+  let left = 0, days = 0;
+  for (const p of done) { left += p.amount - sumC(itemsIn(p)); days += periodLen(p); }
+  const perDay = left / days;
+  return { perDay, monthly: Math.round(perDay * 30.4375), source: 'auto', n: done.length };
+}
+// Wishes are funded in list order: each one waits for the ones above it.
+function wishPlan() {
+  const s = S.settings, r = savingRate();
+  const hasDebt = s.debts.some(d => d.bal > 0);
+  let startDay = todayISO(), debtMonths;
+  if (s.wishAfterDebts && hasDebt) {
+    debtMonths = debtSim().months;
+    if (debtMonths != null) { const d = parseMonth(addMonths(curMonth(), debtMonths)); startDay = isoOf(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
+  }
+  let cum = 0;
+  const rows = s.wishes.map(w => {
+    cum += w.price;
+    const need = cum - (s.wishCushion || 0);
+    let when = null, state;
+    if (need <= 0) state = 'now';
+    else if (s.wishAfterDebts && hasDebt && debtMonths == null) state = 'never';
+    else if (r.source === 'none') state = 'unknown';
+    else if (!(r.perDay > 0)) state = 'never';
+    else { when = addDays(startDay, Math.ceil(need / r.perDay)); state = 'date'; }
+    return { w, need, when, state };
+  });
+  return { r, rows, hasDebt, debtMonths };
+}
+function relLabel(iso) {
+  const d = daysBetween(todayISO(), iso);
+  if (d <= 1) return 'demain';
+  if (d < 45) return `dans ${d} jours`;
+  const m = Math.round(d / 30.4375);
+  return m < 24 ? `dans ${m} mois` : `dans ${Math.round(m / 12)} ans`;
+}
+function renderWishes() {
+  const s = S.settings, { r, rows, hasDebt, debtMonths } = wishPlan();
+  let head = `<div class="view-head"><h1>Souhaits</h1><button class="btn" data-act="wish-new">Ajouter</button></div>`;
+  let rateV, src, warn = '';
+  if (r.source === 'fixed') { rateV = `≈ ${money0(r.monthly)}/mois`; src = 'Montant fixe que tu as indiqué.'; }
+  else if (r.source === 'auto') {
+    rateV = `≈ ${money0(Math.max(r.monthly, 0))}/mois`;
+    src = `Ce qui est resté sous ton seuil, en moyenne sur ${r.n === 1 ? 'ta dernière période terminée' : 'tes ' + r.n + ' dernières périodes terminées'}.`;
+    if (r.monthly <= 0) warn = `<div class="warntext">Tes dernières périodes ont dépassé le seuil : rien n'est mis de côté à ce rythme.</div>`;
+  } else { rateV = '—'; src = "L'estimation commence après ta première période terminée. En attendant, tu peux indiquer un montant fixe."; }
+  const extras = [];
+  if (s.wishCushion) extras.push(`Déjà de côté : ${money0(s.wishCushion)}`);
+  if (s.wishAfterDebts && hasDebt) extras.push(debtMonths != null ? `Commence après la fin des dettes (${payoffLabel(debtMonths)})` : 'Commence après la fin des dettes, qui ne se termine pas au budget actuel');
+  head += `<div class="card rate">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h2>Épargne pour tes souhaits</h2><button class="link" data-act="wish-settings" style="padding:0">Modifier</button></div>
+    <span class="v num">${rateV}</span>${warn}
+    <div class="note">${esc(src)}</div>
+    ${extras.length ? `<div class="note">${esc(extras.join(' · '))}</div>` : ''}
+  </div>`;
+  if (!rows.length) {
+    $('#v-wishes').innerHTML = head + `<div class="empty">Ajoute ce que tu aimerais t'acheter. Expy estime quand tu pourras le payer comptant, d'après ce qui reste sous ton seuil à chaque période.</div>`;
+    return;
+  }
+  const li = rows.map(({ w, when, state }, i) => {
+    const txt = state === 'now' ? '<b>Possible maintenant</b> avec ce qui est de côté'
+      : state === 'date' ? `<b>Vers le ${esc(shortDate(when, true))}</b> · ${relLabel(when)}`
+      : state === 'never' ? '<b>Pas atteignable</b> au rythme actuel'
+      : 'Date estimée après ta première période terminée';
+    return `<li><div class="wish">
+      <button class="w-main" data-act="wish-edit" data-id="${esc(w.id)}"><span class="w-name">${esc(w.name)}${w.ex ? ' <span class="tag ex">ex.</span>' : ''}</span><span class="w-when ${state}">${txt}</span></button>
+      <span class="w-side"><span class="w-price num">${money0(w.price)}</span>
+        <button class="icon-btn" data-act="wish-move" data-id="${esc(w.id)}" data-d="-1" aria-label="Monter ${esc(w.name)}" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="icon-btn" data-act="wish-move" data-id="${esc(w.id)}" data-d="1" aria-label="Descendre ${esc(w.name)}" ${i === rows.length - 1 ? 'disabled' : ''}>↓</button></span>
+    </div></li>`;
+  }).join('');
+  const total = s.wishes.reduce((a, w) => a + w.price, 0);
+  const debtHint = hasDebt && !s.wishAfterDebts
+    ? `<p class="note">Tu as ${money0(s.debts.reduce((a, d) => a + d.bal, 0))} de dettes. Les rembourser avant coûte souvent moins cher que leurs intérêts : coche « Commencer après la libération des dettes » dans Modifier.</p>` : '';
+  $('#v-wishes').innerHTML = head + `<ul class="list">${li}</ul>
+    <p class="note">Total : ${money0(total)}. Les souhaits sont financés dans l'ordre de la liste : chacun attend ceux du dessus. Les dates supposent que tu mets de côté ce qui reste sous ton seuil, sans crédit.</p>${debtHint}`;
+}
+function sheetWish(id) {
+  const s = S.settings, w = id ? s.wishes.find(x => x.id === id) : null;
+  openSheet(`<h1>${w ? 'Modifier le souhait' : 'Nouveau souhait'}</h1>
+    <form class="form" id="wForm">
+      <label>Quoi<input class="field" id="wName" maxlength="40" value="${w ? esc(w.name) : ''}" placeholder="ex. Casque audio" ${w ? '' : 'autofocus'}></label>
+      <label>Prix ($)<input class="field num" id="wPrice" inputmode="decimal" value="${w ? esc(toInputMoney(w.price)) : ''}"></label>
+      <div class="warntext" id="wErr" hidden></div>
+      <button class="btn block" type="submit">${w ? 'Enregistrer' : 'Ajouter à la liste'}</button>
+      ${w ? `<button class="btn ghost block" type="button" id="wBought">Je l'ai acheté</button><button class="btn danger block" type="button" id="wDel">Retirer de la liste</button>` : ''}
+    </form>`);
+  $('#wForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = $('#wName').value.trim(), price = parseMoney($('#wPrice').value);
+    const err = !name ? 'Indique ce que tu veux acheter.' : (price == null || isNaN(price) || price <= 0) ? 'Indique le prix.' : '';
+    if (err) { $('#wErr').textContent = err; $('#wErr').hidden = false; return; }
+    if (w) Object.assign(w, { name, price }); else s.wishes.push({ id: 'w' + uid(), name, price, added: todayISO() });
+    persist(); closeSheet(); renderWishes();
+  });
+  if (!w) return;
+  $('#wDel').addEventListener('click', () => {
+    if (UI.confirm !== 'wdel') { UI.confirm = 'wdel'; $('#wDel').textContent = 'Confirmer'; return; }
+    s.wishes = s.wishes.filter(x => x.id !== w.id); persist(); closeSheet(); renderWishes();
+  });
+  // Bought: leave the list, use what was set aside, and prefill the expense entry.
+  $('#wBought').addEventListener('click', () => {
+    s.wishes = s.wishes.filter(x => x.id !== w.id);
+    s.wishCushion = Math.max(0, (s.wishCushion || 0) - w.price);
+    persist(); closeSheet();
+    resetEntry();
+    UI.amt = toInputMoney(w.price).replace('.', ',');
+    $('#noteIn').value = w.name.slice(0, 80);
+    UI.optsOpen = true; $('#opts').hidden = false; $('#optsBtn').setAttribute('aria-expanded', 'true');
+    UI.cat = suggestCat(amtCents()); UI.home = !!catById(UI.cat).home;
+    showTab('home'); renderAmount(); renderChips(); renderHomeToggle();
+    toast('Choisis la catégorie, puis Ajouter pour enregistrer la dépense.');
+  });
+}
+function sheetWishSettings() {
+  const s = S.settings, auto = savingRate();
+  const autoS = s.wishRate == null ? (auto.source === 'auto' ? `≈ ${money0(Math.max(auto.monthly, 0))}/mois` : 'pas encore disponible') : '';
+  const st = { fixed: s.wishRate != null };
+  openSheet(`<h1>Épargne pour tes souhaits</h1>
+    <form class="form" id="wsForm">
+      <div class="seg" role="group" aria-label="Source">
+        <button type="button" data-src="auto" aria-pressed="${!st.fixed}">Estimation</button>
+        <button type="button" data-src="fixed" aria-pressed="${st.fixed}">Montant fixe</button>
+      </div>
+      <div class="note" id="wsAutoNote" ${st.fixed ? 'hidden' : ''}>Moyenne de ce qui reste sous ton seuil sur tes dernières périodes terminées${autoS ? ' : ' + esc(autoS) : ''}.</div>
+      <label id="wsFixedL" ${st.fixed ? '' : 'hidden'}>Montant mis de côté par mois ($)<input class="field num" id="wsFixed" inputmode="decimal" value="${s.wishRate != null ? esc(toInputMoney(s.wishRate)) : ''}"></label>
+      <label>Déjà de côté pour la liste ($)<input class="field num" id="wsCush" inputmode="decimal" value="${s.wishCushion ? esc(toInputMoney(s.wishCushion)) : ''}" placeholder="0"></label>
+      <label class="chk" style="flex-direction:row;font-size:14px;color:var(--fg)"><input type="checkbox" id="wsDebt" ${s.wishAfterDebts ? 'checked' : ''}>Commencer après la libération des dettes</label>
+      <div class="warntext" id="wsErr" hidden></div>
+      <button class="btn block" type="submit">Enregistrer</button>
+    </form>`);
+  $('#wsForm').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-src]'); if (!b) return;
+    st.fixed = b.dataset.src === 'fixed';
+    for (const x of $('#wsForm .seg').children) x.setAttribute('aria-pressed', String(x.dataset.src === b.dataset.src));
+    $('#wsAutoNote').hidden = st.fixed; $('#wsFixedL').hidden = !st.fixed;
+  });
+  $('#wsForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fx = parseMoney($('#wsFixed').value), cu = parseMoney($('#wsCush').value);
+    if (st.fixed && (fx == null || isNaN(fx) || fx <= 0)) { $('#wsErr').textContent = 'Indique le montant mis de côté chaque mois.'; $('#wsErr').hidden = false; return; }
+    if (cu != null && isNaN(cu)) { $('#wsErr').textContent = 'Le montant déjà de côté doit être un nombre.'; $('#wsErr').hidden = false; return; }
+    s.wishRate = st.fixed ? fx : null;
+    s.wishCushion = cu || 0;
+    s.wishAfterDebts = $('#wsDebt').checked;
+    persist(); closeSheet(); renderWishes();
+  });
+}
+
 /* ---------- Settings view ---------- */
 function renderSettings() {
   const s = S.settings;
@@ -844,7 +1031,7 @@ function renderSettings() {
   const status = 'Tes données restent sur ce téléphone, sans compte ni synchronisation.'
     + (S.persisted === true ? ' Stockage protégé : Chrome ne les effacera pas pour libérer de l\'espace.' : S.persisted === false ? ' Chrome n\'a pas encore protégé le stockage ; installer l\'app aide.' : '')
     + ' Exporte une sauvegarde chaque mois, et avant de changer de téléphone ou de vider les données de Chrome.';
-  const hasEx = allItems().some(i => i.ex) || s.debts.some(d => d.ex);
+  const hasEx = allItems().some(i => i.ex) || s.debts.some(d => d.ex) || s.wishes.some(w => w.ex);
   $('#v-settings').innerHTML = `
     <div class="view-head"><h1>Réglages</h1></div>
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Périodes et seuils</h2><button class="btn ghost" data-act="period-new">Ajouter</button></div>
@@ -865,7 +1052,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.0</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.1</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -1101,6 +1288,8 @@ function loadDemo() {
   s.debts.push({ id: uid(), name: 'Visa', bal: 480000, apr: 20.99, min: 15000, updated: new Date().toISOString(), ex: true });
   s.debts.push({ id: uid(), name: 'Marge de crédit', bal: 250000, apr: 9.5, min: 7500, updated: new Date().toISOString(), ex: true });
   if (s.debtBudget < 50000) s.debtBudget = 50000;
+  s.wishes.push({ id: 'w' + uid(), name: 'Casque audio', price: 34900, added: todayISO(), ex: true });
+  s.wishes.push({ id: 'w' + uid(), name: 'Fin de semaine à Québec', price: 60000, added: todayISO(), ex: true });
   persist('settings', ...touched);
   resetEntry(); rerender();
 }
@@ -1111,6 +1300,7 @@ function clearDemo() {
   s.debts = s.debts.filter(d => !d.ex);
   s.payments = s.payments.filter(p => !exIds.includes(p.debtId));
   s.periods = s.periods.filter(p => !p.ex);
+  s.wishes = s.wishes.filter(w => !w.ex);
   if (!s.debts.length) s.debtBudget = 0;
   persist(...keys); resetEntry(); rerender(); toast("Données d'exemple effacées");
 }
@@ -1118,7 +1308,7 @@ function clearDemo() {
 /* ---------- Navigation & events ---------- */
 function showTab(tab) {
   UI.tab = tab;
-  for (const v of ['home', 'debts', 'stats', 'settings']) $('#v-' + v).hidden = tab !== v;
+  for (const v of ['home', 'debts', 'wishes', 'stats', 'settings']) $('#v-' + v).hidden = tab !== v;
   document.querySelectorAll('.tabs [data-tab]').forEach(b => { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   rerender();
   window.scrollTo(0, 0);
@@ -1128,6 +1318,7 @@ function rerender() {
   if (UI.tab === 'home') renderHome();
   else if (UI.tab === 'debts') renderDebts();
   else if (UI.tab === 'stats') renderStats();
+  else if (UI.tab === 'wishes') renderWishes();
   else renderSettings();
 }
 document.addEventListener('click', (e) => {
@@ -1145,6 +1336,14 @@ document.addEventListener('click', (e) => {
     case 'tab': showTab(t.dataset.tab); break;
     case 'edit-th': { const ap = activePeriod(); sheetPeriod(ap ? ap.id : null); break; }
     case 'period-new': sheetPeriod(null); break;
+    case 'wish-new': sheetWish(null); break;
+    case 'wish-edit': sheetWish(t.dataset.id); break;
+    case 'wish-settings': sheetWishSettings(); break;
+    case 'wish-move': {
+      const ws = S.settings.wishes, i = ws.findIndex(x => x.id === t.dataset.id), j = i + Number(t.dataset.d);
+      if (i < 0 || j < 0 || j >= ws.length) break;
+      [ws[i], ws[j]] = [ws[j], ws[i]]; persist(); renderWishes(); break;
+    }
     case 'period-edit': sheetPeriod(t.dataset.id); break;
     case 'edit-item': sheetItem(t.dataset.id); break;
     case 'debt-new': sheetDebt(null); break;
@@ -1201,12 +1400,12 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) rere
 /* ---------- Boot ---------- */
 applyCache(loadCache());
 resetEntry();
-const HASH_TABS = { '#dettes': 'debts', '#stats': 'stats', '#reglages': 'settings' };
+const HASH_TABS = { '#dettes': 'debts', '#souhaits': 'wishes', '#stats': 'stats', '#reglages': 'settings' };
 showTab(HASH_TABS[location.hash] || 'home');
 window.addEventListener('hashchange', () => { if (HASH_TABS[location.hash]) showTab(HASH_TABS[location.hash]); });
 connect().then(() => { resetEntry(); rerender(); });
 
-window.__budget = { simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod };
+window.__budget = { simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender };
 })();
 </script>
 </body>
