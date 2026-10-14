@@ -397,6 +397,7 @@ function defaultSettings() {
     catsV: 2,
     debts: [], payments: [], debtBudget: 0, method: 'avalanche',
     wishes: [], wishCushion: 0, wishRate: null, wishAfterDebts: false,
+    leftoverToDebt: true, reviewed: {},
     alerts: {}, lastExport: null,
   };
 }
@@ -416,6 +417,8 @@ function normalize(st) {
   const s = Object.assign(defaultSettings(), st || {});
   if (!Array.isArray(s.periods)) s.periods = [];
   if (!Array.isArray(s.wishes)) s.wishes = [];
+  if (typeof s.leftoverToDebt !== 'boolean') s.leftoverToDebt = true;
+  if (!s.reviewed || typeof s.reviewed !== 'object') s.reviewed = {};
   if (st && st.thresholds && Object.keys(st.thresholds).length && !s.periods.length) {
     const th = st.thresholds, cm = curMonth();
     const keys = Object.keys(th).filter(k => k <= cm).sort();
@@ -552,9 +555,16 @@ function suggestCat(amtC) {
   return last ? last.cat : (catOrder()[0] || {}).id;
 }
 function level(total, th) { if (!th) return 0; const p = total / th; return p >= 1 ? 100 : p >= 0.8 ? 80 : 0; }
+// Average monthly amount left under the threshold (finished periods), added to debt repayment when enabled.
+function leftoverExtra() {
+  const s = S.settings;
+  if (!s.leftoverToDebt) return 0;
+  const a = autoLeftover();
+  return a && a.monthly > 0 ? a.monthly : 0;
+}
 function debtSim(budget) {
   const s = S.settings;
-  return simulate(s.debts, budget ?? s.debtBudget, s.method);
+  return simulate(s.debts, (budget ?? s.debtBudget) + leftoverExtra(), s.method);
 }
 const payoffLabel = (k) => k == null ? 'jamais à ce rythme' : monthLabel(addMonths(curMonth(), k));
 
@@ -672,8 +682,23 @@ function renderSummary() {
     ${line ? `<div class="sum-line">${line}</div>` : ''}
     <div class="minis">${homeMini}${debtMini}</div>`;
 }
+// The latest finished period whose debts have not been updated yet (shown the day after it ends).
+function pendingReview() {
+  const s = S.settings, today = todayISO();
+  if (!s.debts.some(d => d.bal > 0)) return null;
+  const p = s.periods.filter(x => x.end < today && !x.ex).sort((a, b) => b.end.localeCompare(a.end))[0];
+  if (!p || s.reviewed[p.id] || UI.reviewLater === p.id) return null;
+  return p;
+}
 function renderBanners() {
   const out = [];
+  const rv = pendingReview();
+  if (rv) {
+    const left = rv.amount - sumC(itemsIn(rv));
+    out.push(`<div class="banner warn" style="flex-direction:column;align-items:stretch;gap:8px">
+      <span><b>Période du ${esc(shortDate(rv.start))} au ${esc(shortDate(rv.end))} terminée.</b> ${left >= 0 ? `Il te reste ${money(left)} sous le seuil.` : `Seuil dépassé de ${money(-left)}.`} As-tu remboursé ta carte ? Mets tes soldes à jour.</span>
+      <span style="display:flex;gap:8px;justify-content:flex-end"><button class="link" data-act="review-later">Plus tard</button><button class="btn" data-act="review" data-id="${esc(rv.id)}">Mettre à jour</button></span></div>`);
+  }
   const hasEx = allItems().some(i => i.ex) || S.settings.debts.some(d => d.ex) || S.settings.wishes.some(w => w.ex);
   if (hasEx) out.push(`<div class="banner ex"><span>Données d'exemple affichées.</span><button class="link" data-act="clear-demo">Tout effacer</button></div>`);
   const anyData = allItems().length || S.settings.debts.length;
@@ -717,6 +742,7 @@ function renderDebts() {
     $('#v-debts').innerHTML = body; return;
   }
   const maxB = Math.max(sumMin * 3, sumMin + 100000, s.debtBudget);
+  const lastUpd = s.debts.map(d => (d.updated || '').slice(0, 10)).filter(Boolean).sort().pop();
   const extra = Math.max(s.debtBudget - sumMin, 0);
   body += `<div class="card">
     <div class="free"><span class="note">Libération complète</span><span class="v num" id="freeDate">${active.length ? cap(payoffLabel(sim.months)) : 'Fait'}</span></div>
@@ -729,7 +755,8 @@ function renderDebts() {
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h2>Budget mensuel</h2><span class="num" style="font-size:20px;font-weight:740" id="budgetOut">${money0(s.debtBudget)}</span></div>
     <input class="range" id="budgetRange" type="range" min="${Math.ceil(sumMin / 1000) * 1000}" max="${Math.ceil(maxB / 1000) * 1000}" step="1000" value="${Math.max(s.debtBudget, Math.ceil(sumMin / 1000) * 1000)}" aria-label="Budget mensuel de remboursement">
-    <div class="note" id="budgetNote">Minimums ${money0(sumMin)} + extra ${money0(extra)}</div>
+    <div class="note" id="budgetNote">${budgetNoteText(s.debtBudget, sumMin)}</div>
+    <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="leftoverToggle" ${s.leftoverToDebt ? 'checked' : ''}>Ajouter le reste de chaque période sous le seuil</label>
     ${sim.short ? `<div class="warntext">Le budget est sous la somme des minimums (${money(sumMin)}).</div>` : ''}
     ${sim.never && !sim.short ? `<div class="warntext">À ce budget, au moins une dette ne sera jamais remboursée.</div>` : ''}
     <div class="seg" role="group" aria-label="Méthode">
@@ -748,8 +775,17 @@ function renderDebts() {
       ${interestOnly ? `<span class="warnline">Le minimum ne couvre pas les intérêts (${money(Math.ceil(d.bal * d.apr / 1200))}/mois).</span>` : ''}
     </button></li>`;
   }).join('')}</ul>
-  <p class="note">Les dates supposent que le budget mensuel est payé chaque mois. Quand une dette est soldée, son paiement passe à la suivante.</p>`;
+  <p class="note">Les dates supposent que le budget mensuel${s.leftoverToDebt ? ', plus le reste moyen sous ton seuil,' : ''} est payé chaque mois. Quand une dette est soldée, son paiement passe à la suivante.${lastUpd ? ' Soldes mis à jour le ' + esc(shortDate(lastUpd, true)) + '.' : ''}</p>`;
   $('#v-debts').innerHTML = body;
+}
+function budgetNoteText(v, sumMin) {
+  let t = `Minimums ${money0(sumMin)} + extra ${money0(Math.max(v - sumMin, 0))}`;
+  if (S.settings.leftoverToDebt) {
+    const a = autoLeftover();
+    t += a ? (a.monthly > 0 ? ` + reste moyen du budget ≈ ${money0(a.monthly)}/mois` : ' · aucun reste sous le seuil ces dernières périodes')
+      : ' · le reste sous le seuil comptera dès ta première période terminée';
+  }
+  return t;
 }
 function previewBudget(v) {
   const sim = debtSim(v);
@@ -757,7 +793,7 @@ function previewBudget(v) {
   $('#freeDate').textContent = cap(payoffLabel(sim.months));
   $('#intTotal').textContent = money0(sim.interest);
   $('#monthsN').textContent = sim.months ?? '—';
-  $('#budgetNote').textContent = `Minimums ${money0(sim.sumMin)} + extra ${money0(Math.max(v - sim.sumMin, 0))}`;
+  $('#budgetNote').textContent = budgetNoteText(v, sim.sumMin);
   for (const el of document.querySelectorAll('[data-payoff]')) {
     const d = S.settings.debts.find(x => x.id === el.dataset.payoff);
     if (d && d.bal > 0) el.textContent = 'Soldée en ' + payoffLabel(sim.payoff[d.id]);
@@ -857,23 +893,30 @@ function periodsCard() {
 /* ---------- Wish list ---------- */
 // Saving capacity = what stayed under the threshold in the last finished periods (up to 6), per day.
 // A fixed monthly amount set by the user overrides it.
-function savingRate() {
-  const s = S.settings;
-  if (s.wishRate != null) return { perDay: s.wishRate / 30.4375, monthly: s.wishRate, source: 'fixed' };
+function autoLeftover() {
   const today = todayISO();
-  const done = s.periods.filter(p => p.end < today).sort((a, b) => b.end.localeCompare(a.end)).slice(0, 6);
-  if (!done.length) return { perDay: null, monthly: null, source: 'none' };
+  const done = S.settings.periods.filter(p => p.end < today).sort((a, b) => b.end.localeCompare(a.end)).slice(0, 6);
+  if (!done.length) return null;
   let left = 0, days = 0;
   for (const p of done) { left += p.amount - sumC(itemsIn(p)); days += periodLen(p); }
   const perDay = left / days;
-  return { perDay, monthly: Math.round(perDay * 30.4375), source: 'auto', n: done.length };
+  return { perDay, monthly: Math.round(perDay * 30.4375), n: done.length };
 }
+function savingRate() {
+  const s = S.settings;
+  if (s.wishRate != null) return { perDay: s.wishRate / 30.4375, monthly: s.wishRate, source: 'fixed' };
+  const a = autoLeftover();
+  if (!a) return { perDay: null, monthly: null, source: 'none' };
+  return Object.assign({ source: 'auto' }, a);
+}
+// While debts remain and the leftover goes to them, the estimated savings only start after the debts.
+const wishesWaitForDebts = () => { const s = S.settings; return s.wishAfterDebts || (s.leftoverToDebt && s.wishRate == null); };
 // Wishes are funded in list order: each one waits for the ones above it.
 function wishPlan() {
   const s = S.settings, r = savingRate();
   const hasDebt = s.debts.some(d => d.bal > 0);
   let startDay = todayISO(), debtMonths;
-  if (s.wishAfterDebts && hasDebt) {
+  if (wishesWaitForDebts() && hasDebt) {
     debtMonths = debtSim().months;
     if (debtMonths != null) { const d = parseMonth(addMonths(curMonth(), debtMonths)); startDay = isoOf(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
   }
@@ -883,7 +926,7 @@ function wishPlan() {
     const need = cum - (s.wishCushion || 0);
     let when = null, state;
     if (need <= 0) state = 'now';
-    else if (s.wishAfterDebts && hasDebt && debtMonths == null) state = 'never';
+    else if (wishesWaitForDebts() && hasDebt && debtMonths == null) state = 'never';
     else if (r.source === 'none') state = 'unknown';
     else if (!(r.perDay > 0)) state = 'never';
     else { when = addDays(startDay, Math.ceil(need / r.perDay)); state = 'date'; }
@@ -910,7 +953,7 @@ function renderWishes() {
   } else { rateV = '—'; src = "L'estimation commence après ta première période terminée. En attendant, tu peux indiquer un montant fixe."; }
   const extras = [];
   if (s.wishCushion) extras.push(`Déjà de côté : ${money0(s.wishCushion)}`);
-  if (s.wishAfterDebts && hasDebt) extras.push(debtMonths != null ? `Commence après la fin des dettes (${payoffLabel(debtMonths)})` : 'Commence après la fin des dettes, qui ne se termine pas au budget actuel');
+  if (wishesWaitForDebts() && hasDebt) extras.push((!s.wishAfterDebts ? 'Le reste du budget va d\'abord aux dettes. ' : '') + (debtMonths != null ? `Commence après la fin des dettes (${payoffLabel(debtMonths)})` : 'Commence après la fin des dettes, qui ne se termine pas au budget actuel'));
   head += `<div class="card rate">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h2>Épargne pour tes souhaits</h2><button class="link" data-act="wish-settings" style="padding:0">Modifier</button></div>
     <span class="v num">${rateV}</span>${warn}
@@ -934,7 +977,7 @@ function renderWishes() {
     </div></li>`;
   }).join('');
   const total = s.wishes.reduce((a, w) => a + w.price, 0);
-  const debtHint = hasDebt && !s.wishAfterDebts
+  const debtHint = hasDebt && !wishesWaitForDebts()
     ? `<p class="note">Tu as ${money0(s.debts.reduce((a, d) => a + d.bal, 0))} de dettes. Les rembourser avant coûte souvent moins cher que leurs intérêts : coche « Commencer après la libération des dettes » dans Modifier.</p>` : '';
   $('#v-wishes').innerHTML = head + `<ul class="list">${li}</ul>
     <p class="note">Total : ${money0(total)}. Les souhaits sont financés dans l'ordre de la liste : chacun attend ceux du dessus. Les dates supposent que tu mets de côté ce qui reste sous ton seuil, sans crédit.</p>${debtHint}`;
@@ -990,6 +1033,7 @@ function sheetWishSettings() {
       <label id="wsFixedL" ${st.fixed ? '' : 'hidden'}>Montant mis de côté par mois ($)<input class="field num" id="wsFixed" inputmode="decimal" value="${s.wishRate != null ? esc(toInputMoney(s.wishRate)) : ''}"></label>
       <label>Déjà de côté pour la liste ($)<input class="field num" id="wsCush" inputmode="decimal" value="${s.wishCushion ? esc(toInputMoney(s.wishCushion)) : ''}" placeholder="0"></label>
       <label class="chk" style="flex-direction:row;font-size:14px;color:var(--fg)"><input type="checkbox" id="wsDebt" ${s.wishAfterDebts ? 'checked' : ''}>Commencer après la libération des dettes</label>
+      ${s.leftoverToDebt && s.debts.some(d => d.bal > 0) ? '<div class="note">Le reste de ton budget va aux dettes (onglet Dettes). Avec l\'estimation, tes souhaits attendent donc la fin des dettes. Un montant fixe, lui, est mis de côté à part.</div>' : ''}
       <div class="warntext" id="wsErr" hidden></div>
       <button class="btn block" type="submit">Enregistrer</button>
     </form>`);
@@ -1052,7 +1096,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.1</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.2</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -1212,6 +1256,52 @@ function sheetDebt(id) {
   }
 }
 
+// End-of-period check-in: recap of the period, then the balance of each debt today.
+// A lower balance is logged as a payment; a higher one just updates the balance (new charges).
+function sheetReview(pid) {
+  const s = S.settings, p = s.periods.find(x => x.id === pid);
+  if (!p) return;
+  const spent = sumC(itemsIn(p)), left = p.amount - spent;
+  const active = s.debts.filter(d => d.bal > 0);
+  const prio = debtSim().priority;
+  const pd = active.find(d => d.id === prio) || active[0];
+  openSheet(`<h1>Fin de période</h1>
+    <div class="card"><div class="kv">
+      <div><span class="k">Dépensé</span><span class="v num">${money0(spent)}</span></div>
+      <div><span class="k">Seuil</span><span class="v num">${money0(p.amount)}</span></div>
+      <div><span class="k">${left >= 0 ? 'Reste' : 'Dépassé'}</span><span class="v num" style="color:${left >= 0 ? 'var(--ok)' : 'var(--bad)'}">${money0(Math.abs(left))}</span></div>
+    </div><div class="note">Du ${esc(shortDate(p.start, true))} au ${esc(shortDate(p.end, true))}.</div></div>
+    <form class="form" id="rvForm">
+      <div class="note">Indique le solde de chaque dette aujourd'hui, d'après ton relevé ou ton appli bancaire.</div>
+      ${active.map(d => `<label>${esc(d.name)} · solde avant : ${money(d.bal)}<input class="field num" id="rv-${esc(d.id)}" data-debt="${esc(d.id)}" inputmode="decimal" value="${esc(toInputMoney(d.bal))}"></label>`).join('')}
+      ${left > 0 && pd ? `<button type="button" class="btn ghost" id="rvApply">Déduire les ${money0(left)} restants de ${esc(pd.name)}</button>` : ''}
+      <div class="warntext" id="rvErr" hidden></div>
+      <button class="btn block" type="submit">Enregistrer les soldes</button>
+      <button class="btn ghost block" type="button" id="rvNone">Rien à changer</button>
+    </form>`);
+  if (left > 0 && pd) $('#rvApply').addEventListener('click', () => {
+    const f = $('#rv-' + pd.id); f.value = toInputMoney(Math.max(0, pd.bal - left));
+  });
+  const done = (msg) => { s.reviewed[p.id] = new Date().toISOString(); persist(); closeSheet(); rerender(); if (msg) toast(msg); };
+  $('#rvNone').addEventListener('click', () => done(''));
+  $('#rvForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const vals = [];
+    for (const d of active) {
+      const v = parseMoney($('#rv-' + d.id).value);
+      if (v == null || isNaN(v)) { $('#rvErr').textContent = `Indique le solde de ${d.name} (0 si payée au complet).`; $('#rvErr').hidden = false; return; }
+      vals.push([d, v]);
+    }
+    let paid = 0;
+    for (const [d, v] of vals) {
+      if (v < d.bal) { s.payments.push({ id: uid(), debtId: d.id, amt: d.bal - v, date: todayISO(), note: 'Fin de période' }); paid += d.bal - v; }
+      if (v !== d.bal) { d.bal = v; d.updated = new Date().toISOString(); }
+    }
+    const sim = debtSim();
+    done(`Soldes à jour${paid ? ` · ${money0(paid)} remboursés` : ''}${s.debts.some(d => d.bal > 0) ? ' · libre en ' + payoffLabel(sim.months) : ' · plus de dettes'}`);
+  });
+}
+
 /* ---------- Toast ---------- */
 function toast(msg, undo, kind = '') {
   const t = $('#toast');
@@ -1337,6 +1427,8 @@ document.addEventListener('click', (e) => {
     case 'edit-th': { const ap = activePeriod(); sheetPeriod(ap ? ap.id : null); break; }
     case 'period-new': sheetPeriod(null); break;
     case 'wish-new': sheetWish(null); break;
+    case 'review': sheetReview(t.dataset.id); break;
+    case 'review-later': { const rv = pendingReview(); if (rv) UI.reviewLater = rv.id; renderBanners(); break; }
     case 'wish-edit': sheetWish(t.dataset.id); break;
     case 'wish-settings': sheetWishSettings(); break;
     case 'wish-move': {
@@ -1376,6 +1468,7 @@ document.addEventListener('input', (e) => {
 document.addEventListener('change', (e) => {
   const el = e.target, f = el.dataset && el.dataset.field, s = S.settings;
   if (el.id === 'budgetRange') { s.debtBudget = Number(el.value); persist('settings'); renderDebts(); return; }
+  if (el.id === 'leftoverToggle') { s.leftoverToDebt = el.checked; persist('settings'); renderDebts(); return; }
   if (!f) return;
   {
     const c = s.cats.find(x => x.id === el.dataset.id); if (!c) return;
@@ -1405,7 +1498,7 @@ showTab(HASH_TABS[location.hash] || 'home');
 window.addEventListener('hashchange', () => { if (HASH_TABS[location.hash]) showTab(HASH_TABS[location.hash]); });
 connect().then(() => { resetEntry(); rerender(); });
 
-window.__budget = { simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender };
+window.__budget = { simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
 })();
 </script>
 </body>
