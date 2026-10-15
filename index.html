@@ -741,7 +741,6 @@ function renderDebts() {
     body += `<div class="empty">Aucune dette suivie. Ajoute un solde de carte de crédit ou une marge pour voir ta date de remboursement complet.</div>`;
     $('#v-debts').innerHTML = body; return;
   }
-  const maxB = Math.max(sumMin * 3, sumMin + 100000, s.debtBudget);
   const lastUpd = s.debts.map(d => (d.updated || '').slice(0, 10)).filter(Boolean).sort().pop();
   const extra = Math.max(s.debtBudget - sumMin, 0);
   body += `<div class="card">
@@ -753,8 +752,11 @@ function renderDebts() {
     </div>
   </div>
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h2>Budget mensuel</h2><span class="num" style="font-size:20px;font-weight:740" id="budgetOut">${money0(s.debtBudget)}</span></div>
-    <input class="range" id="budgetRange" type="range" min="${Math.ceil(sumMin / 1000) * 1000}" max="${Math.ceil(maxB / 1000) * 1000}" step="1000" value="${Math.max(s.debtBudget, Math.ceil(sumMin / 1000) * 1000)}" aria-label="Budget mensuel de remboursement">
+    <label for="budgetIn"><h2>Budget mensuel de remboursement</h2></label>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center">
+      <input class="field num" id="budgetIn" inputmode="decimal" enterkeyhint="done" value="${esc(toInputMoney(s.debtBudget))}" style="font-size:22px;font-weight:700;padding:10px 12px">
+      <span class="muted" style="font-weight:600">$ / mois</span>
+    </div>
     <div class="note" id="budgetNote">${budgetNoteText(s.debtBudget, sumMin)}</div>
     <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="leftoverToggle" ${s.leftoverToDebt ? 'checked' : ''}>Ajouter le reste de chaque période sous le seuil</label>
     ${sim.short ? `<div class="warntext">Le budget est sous la somme des minimums (${money(sumMin)}).</div>` : ''}
@@ -789,7 +791,6 @@ function budgetNoteText(v, sumMin) {
 }
 function previewBudget(v) {
   const sim = debtSim(v);
-  $('#budgetOut').textContent = money0(v);
   $('#freeDate').textContent = cap(payoffLabel(sim.months));
   $('#intTotal').textContent = money0(sim.interest);
   $('#monthsN').textContent = sim.months ?? '—';
@@ -1096,7 +1097,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.2</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.2.1</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -1463,11 +1464,11 @@ document.addEventListener('click', (e) => {
   }
 });
 document.addEventListener('input', (e) => {
-  if (e.target.id === 'budgetRange') previewBudget(Number(e.target.value));
+  if (e.target.id === 'budgetIn') { const v = parseMoney(e.target.value); if (v != null && !isNaN(v)) previewBudget(v); }
 });
 document.addEventListener('change', (e) => {
   const el = e.target, f = el.dataset && el.dataset.field, s = S.settings;
-  if (el.id === 'budgetRange') { s.debtBudget = Number(el.value); persist('settings'); renderDebts(); return; }
+  if (el.id === 'budgetIn') { const v = parseMoney(el.value); if (v != null && !isNaN(v)) { s.debtBudget = v; persist('settings'); } renderDebts(); return; }
   if (el.id === 'leftoverToggle') { s.leftoverToDebt = el.checked; persist('settings'); renderDebts(); return; }
   if (!f) return;
   {
@@ -1488,6 +1489,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Enter' && amtCents() > 0) { addExpense(); e.preventDefault(); }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'budgetIn') e.target.blur(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) rerender(); });
 
 /* ---------- Boot ---------- */

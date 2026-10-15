@@ -1,5 +1,5 @@
 // Offline cache for Expy. Bump VERSION when files change.
-const VERSION = 'expy-v1.2.0';
+const VERSION = 'expy-v1.2.1';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'fonts/archivo.woff2', 'fonts/plex-mono-400.woff2', 'fonts/plex-mono-500.woff2', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'];
 
 self.addEventListener('install', (e) => {
