@@ -7,6 +7,7 @@
 <meta name="description" content="Saisie de dépenses en 2 secondes, seuil par période et suivi de dettes.">
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0A0A0A" media="(prefers-color-scheme: dark)">
+<script>try{var t=localStorage.getItem("bex1:theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -244,9 +245,8 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .set-row { display: grid; grid-template-columns: 1fr 120px; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
 .set-row:first-child { border-top: 0; }
 .set-row label { font-weight: 600; }
-.cat-edit { display: grid; grid-template-columns: 12px 1fr 1fr 34px; grid-template-areas: "dot name name del" ". lim home ."; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
-.cat-edit > .dot { grid-area: dot; }
-.cat-edit .dot { width: 12px; height: 12px; border-radius: 50%; }
+.cat-edit { display: grid; grid-template-columns: 26px 1fr 1fr 34px; grid-template-areas: "dot name name del" ". lim home ."; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.cat-edit > .ico { grid-area: dot; }
 .cat-edit > [data-field="cat-name"] { grid-area: name; }
 .cat-edit > [data-field="cat-limit"] { grid-area: lim; }
 .cat-edit > .chk { grid-area: home; }
@@ -256,6 +256,12 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .chk input { accent-color: var(--home); width: 18px; height: 18px; }
 .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.ico-btn { border: 0; padding: 0; }
+.seg.three { grid-template-columns: repeat(3, 1fr); }
+.pick-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.pick { border: 2px solid transparent; background: var(--surface); border-radius: 16px; padding: 9px 0; display: flex; justify-content: center; }
+.pick[aria-pressed="true"] { border-color: var(--fg); }
+.pick .ico { width: 28px; height: 28px; }
 
 /* Tab bar: floating pill */
 .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; pointer-events: none; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
@@ -435,7 +441,7 @@ function defaultSettings() {
     debts: [], payments: [], debtBudget: 0, method: 'avalanche',
     wishes: [], wishCushion: 0, wishRate: null, wishAfterDebts: false,
     leftoverToDebt: true, reviewed: {},
-    alerts: {}, lastExport: null,
+    alerts: {}, lastExport: null, theme: 'auto',
   };
 }
 const DEFAULT_CATS = [
@@ -462,9 +468,22 @@ const CAT_ICONS = {
   livres: '<path d="M5 5a2 2 0 0 1 2-2h11v16H7a2 2 0 0 0-2 2z"/><path d="M5 19V5M9 7h5"/>',
   jeux: '<rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 10.5v4M6 12.5h4"/><circle cx="15.5" cy="11.5" r=".6"/><circle cx="17.5" cy="13.5" r=".6"/>',
   autre: '<circle cx="6" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18" cy="12" r="1.2"/>',
+  sante: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  vetements: '<path d="M8 4l-5 3 2 4 3-1v10h8V10l3 1 2-4-5-3a4 4 0 0 1-8 0z"/>',
+  cadeau: '<rect x="4" y="9" width="16" height="11" rx="1"/><path d="M3 6h18v3H3zM12 6v14"/>',
+  voyage: '<path d="M3 13l18-9-5 17-4-7z"/><path d="M12 14l9-10"/>',
+  sport: '<path d="M6 8v8M3 10v4M18 8v8M21 10v4M6 12h12"/>',
+  cinema: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M10 9.5v5l4-2.5z"/>',
+  telephone: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>',
+  animaux: '<circle cx="6" cy="10" r="1.6"/><circle cx="10" cy="6.5" r="1.6"/><circle cx="14" cy="6.5" r="1.6"/><circle cx="18" cy="10" r="1.6"/><path d="M8 17c0-3 2-5 4-5s4 2 4 5c0 2-2 2-4 2s-4 0-4-2z"/>',
+  musique: '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
+  abonnement: '<path d="M17 3l3 3-3 3"/><path d="M4 11V9a3 3 0 0 1 3-3h13"/><path d="M7 21l-3-3 3-3"/><path d="M20 13v2a3 3 0 0 1-3 3H4"/>',
+  essence: '<path d="M5 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15M4 20h11"/><path d="M14 9h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V9l-3-3"/>',
   _: '<path d="M4 12V5h7l9 9-7 7z"/><circle cx="8.5" cy="8.5" r="1"/>',
 };
-const catIconSvg = (id) => `<svg viewBox="0 0 24 24" aria-hidden="true">${CAT_ICONS[id] || CAT_ICONS._}</svg>`;
+const ICON_NAMES = { cafe: 'Café', restaurant: 'Restaurant', epicerie: 'Épicerie', transport: 'Transport', maison: 'Maison', loisirs: 'Étoile', livres: 'Livre', jeux: 'Manette', autre: 'Points', sante: 'Santé', vetements: 'Vêtements', cadeau: 'Cadeau', voyage: 'Voyage', sport: 'Sport', cinema: 'Cinéma', telephone: 'Téléphone', animaux: 'Animaux', musique: 'Musique', abonnement: 'Abonnement', essence: 'Essence', _: 'Étiquette' };
+const catIconKey = (c) => (c.icon && CAT_ICONS[c.icon]) ? c.icon : (CAT_ICONS[c.id] ? c.id : '_');
+const catIconSvg = (c) => `<svg viewBox="0 0 24 24" aria-hidden="true">${CAT_ICONS[catIconKey(c)]}</svg>`;
 // Brings settings saved by an older version up to date.
 function normalize(st) {
   const s = Object.assign(defaultSettings(), st || {});
@@ -493,6 +512,7 @@ function normalize(st) {
     for (const c of s.cats) { const nw = DEFAULT_CATS.find(d => d.id === c.id); if (nw && c.color === OLD_CAT_COLORS[c.id]) c.color = nw.color; }
     s.catsV = 3;
   }
+  if (!['auto', 'light', 'dark'].includes(s.theme)) s.theme = 'auto';
   s.v = 2;
   return s;
 }
@@ -505,6 +525,14 @@ const LS_KEY = 'bex1:data';
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 function loadCache() { try { const r = lsGet(LS_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+function applyTheme() {
+  const t = S.settings.theme, root = document.documentElement;
+  if (t === 'light' || t === 'dark') root.dataset.theme = t; else delete root.dataset.theme;
+  lsSet('bex1:theme', t === 'light' || t === 'dark' ? t : 'auto');
+  const metas = document.querySelectorAll('meta[name="theme-color"]');
+  const col = t === 'dark' ? '#0A0A0A' : t === 'light' ? '#FFFFFF' : null;
+  metas.forEach((m, i) => m.setAttribute('content', col || (i === 0 ? '#FFFFFF' : '#0A0A0A')));
+}
 function applyCache(c) {
   if (!c) return;
   S.settings = normalize(c.settings);
@@ -685,7 +713,7 @@ function renderChips() {
   if (!UI.cat || !S.settings.cats.some(c => c.id === UI.cat)) UI.cat = suggestCat(0);
   const keepX = $('#chips').scrollLeft;
   $('#chips').innerHTML = cats.map(c =>
-    `<button class="tile" data-act="pick-cat" data-cat="${esc(c.id)}" aria-pressed="${c.id === UI.cat}"><span class="ico" style="background:${esc(c.color)}">${catIconSvg(c.id)}</span><span class="tn">${esc(c.name)}</span></button>`).join('');
+    `<button class="tile" data-act="pick-cat" data-cat="${esc(c.id)}" aria-pressed="${c.id === UI.cat}"><span class="ico" style="background:${esc(c.color)}">${catIconSvg(c)}</span><span class="tn">${esc(c.name)}</span></button>`).join('');
   // keep the sideways scroll position, and bring the selected tile into view without moving the page
   const box = $('#chips'); box.scrollLeft = keepX;
   const on = box.querySelector('[aria-pressed="true"]');
@@ -1158,7 +1186,7 @@ function renderSettings() {
       <span class="main"><span class="t">${esc(rangeLabel(p, true))}${cur ? ' <span class="tag prio">En cours</span>' : ''}</span><span class="d">Seuil ${money0(p.amount)} · ${periodLen(p)} jours · ${st}</span></span><span class="muted">›</span></button></li>`;
   }).join('')}</ul>` : '<div class="note">Aucune période. Le tableau de bord affiche alors le mois civil, sans seuil.</div>';
   const catRows = s.cats.map((c, i) => `<div class="cat-edit">
-      <span class="dot" style="background:${esc(c.color)}"></span>
+      <button class="ico ico-btn" data-act="cat-icon" data-id="${esc(c.id)}" style="background:${esc(c.color)}" aria-label="Icône et couleur de ${esc(c.name)}">${catIconSvg(c)}</button>
       <input class="field" id="cn-${esc(c.id)}" data-field="cat-name" data-id="${esc(c.id)}" value="${esc(c.name)}" maxlength="24" aria-label="Nom de la catégorie">
       <input class="field num" id="cl-${esc(c.id)}" data-field="cat-limit" data-id="${esc(c.id)}" inputmode="decimal" value="${c.limit != null ? esc(toInputMoney(c.limit)) : ''}" placeholder="Seuil $/mois" aria-label="Seuil mensuel de la catégorie">
       <label class="chk" title="Coche « Faisable à la maison » par défaut"><input type="checkbox" id="ch-${esc(c.id)}" data-field="cat-home" data-id="${esc(c.id)}" ${c.home ? 'checked' : ''}>Faisable maison</label>
@@ -1173,8 +1201,14 @@ function renderSettings() {
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Périodes et seuils</h2><button class="btn ghost" data-act="period-new">Ajouter</button></div>
       <div class="note">Choisis le début et la fin de chaque période (ex. d'une paie à l'autre). Quand une période se termine, la suivante est créée avec la même durée et le même seuil. Les stats restent calculées par mois civil.</div>
       ${thRows}${periods.length > 12 ? `<div class="note">${periods.length - 12} périodes plus anciennes.</div>` : ''}</div>
-    <div class="card"><h2>Catégories</h2><div class="note">Seuil facultatif par catégorie. « Faisable maison » coche la bascule par défaut à la saisie.</div><div>${catRows}</div>
+    <div class="card"><h2>Catégories</h2><div class="note">Touche l'icône pour changer l'icône et la couleur. Seuil facultatif par catégorie. « Faisable maison » coche la bascule par défaut à la saisie.</div><div>${catRows}</div>
       <div style="display:grid;grid-template-columns:1fr auto;gap:8px"><input class="field" id="newCat" maxlength="24" placeholder="Nouvelle catégorie"><button class="btn ghost" data-act="cat-add">Ajouter</button></div></div>
+    <div class="card"><h2>Apparence</h2>
+      <div class="seg three" role="group" aria-label="Thème">
+        ${[['auto', 'Auto'], ['light', 'Clair'], ['dark', 'Sombre']].map(([v, l]) => `<button data-act="theme" data-t="${v}" aria-pressed="${s.theme === v}">${l}</button>`).join('')}
+      </div>
+      <div class="note">Auto suit le réglage de ton téléphone.</div>
+    </div>
     <div class="card"><h2>Données</h2><div class="note">${esc(status)}</div>
       <div class="btn-row">
         ${S.dl ? `<button class="btn ghost" data-act="export-csv">Exporter CSV</button><button class="btn ghost" data-act="export-json">Sauvegarde complète</button>` : '<span class="note">L\'export de fichiers n\'est pas offert dans cette vue.</span>'}
@@ -1188,7 +1222,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.4</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.5</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -1197,6 +1231,16 @@ function closeSheet() { $('#sheet').hidden = true; $('#sheetPanel').innerHTML = 
 
 // Edit a budget period, or create one (id null). Defaults for a new one: the day after the latest period,
 // for the same length and amount; with no period yet, the current calendar month.
+function sheetCatIcon(id) {
+  const c = S.settings.cats.find(x => x.id === id); if (!c) return;
+  const cur = catIconKey(c);
+  openSheet(`<h1>${esc(c.name)}</h1>
+    <h2>Icône</h2>
+    <div class="pick-grid">${Object.keys(CAT_ICONS).map(k => `<button type="button" class="pick" data-act="pick-icon" data-id="${esc(id)}" data-key="${k}" aria-pressed="${k === cur}" aria-label="${esc(ICON_NAMES[k] || k)}"><span class="ico" style="background:${esc(c.color)}"><svg viewBox="0 0 24 24" aria-hidden="true">${CAT_ICONS[k]}</svg></span></button>`).join('')}</div>
+    <h2>Couleur</h2>
+    <div class="pick-grid">${PALETTE.map(p => `<button type="button" class="pick" data-act="pick-color" data-id="${esc(id)}" data-color="${p}" aria-pressed="${p === c.color}" aria-label="Couleur ${p}"><span class="ico" style="background:${p}"></span></button>`).join('')}</div>
+    <button class="btn block" data-act="close-sheet">Fermer</button>`);
+}
 function sheetPeriod(id) {
   const s = S.settings;
   const p = id ? s.periods.find(x => x.id === id) : null;
@@ -1437,7 +1481,7 @@ $('#importIn').addEventListener('change', async (e) => {
     S.settings = normalize(data.settings);
     S.months = data.months;
     persist('settings', ...new Set([...oldKeys, ...Object.keys(S.months).map(mKey)]));
-    closeSheet(); resetEntry(); rerender(); toast('Sauvegarde restaurée');
+    applyTheme(); closeSheet(); resetEntry(); rerender(); toast('Sauvegarde restaurée');
   };
 });
 
@@ -1535,6 +1579,10 @@ document.addEventListener('click', (e) => {
     case 'debt-edit': sheetDebt(t.dataset.id); break;
     case 'method': S.settings.method = t.dataset.m; persist('settings'); renderDebts(); break;
     case 'month': UI.statsMonth = addMonths(UI.statsMonth, Number(t.dataset.d)); renderStats(); break;
+    case 'cat-icon': sheetCatIcon(t.dataset.id); break;
+    case 'pick-icon': { const c = S.settings.cats.find(x => x.id === t.dataset.id); if (c) { c.icon = t.dataset.key; persist('settings'); sheetCatIcon(c.id); renderSettings(); } break; }
+    case 'pick-color': { const c = S.settings.cats.find(x => x.id === t.dataset.id); if (c) { c.color = t.dataset.color; persist('settings'); sheetCatIcon(c.id); renderSettings(); } break; }
+    case 'theme': S.settings.theme = t.dataset.t; persist('settings'); applyTheme(); renderSettings(); break;
     case 'cat-add': {
       const name = $('#newCat').value.trim(); if (!name) { $('#newCat').focus(); return; }
       const used = new Set(S.settings.cats.map(c => c.color));
@@ -1586,6 +1634,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) rere
 
 /* ---------- Boot ---------- */
 applyCache(loadCache());
+applyTheme();
 resetEntry();
 const HASH_TABS = { '#dettes': 'debts', '#souhaits': 'wishes', '#stats': 'stats', '#reglages': 'settings' };
 showTab(HASH_TABS[location.hash] || 'home');
