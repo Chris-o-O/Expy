@@ -14,4 +14,4 @@ Aucune donnée personnelle n'est stockée dans ce dépôt.
 Ouvrir le site GitHub Pages dans Chrome sur Android, puis menu ⋮ › Installer l'application.
 
 ## Mettre à jour
-Modifier les fichiers, puis changer `VERSION` dans `sw.js` pour que les téléphones prennent la nouvelle version au lancement suivant.
+Modifier les fichiers, puis changer `VERSION` dans `sw.js`. Les téléphones téléchargent la nouvelle version en arrière-plan et l'app affiche « Mettre à jour » (un toucher).

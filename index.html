@@ -494,8 +494,33 @@ async function connect() { await askPersist(); }
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); UI.installEvt = e; rerender(); });
 window.addEventListener('appinstalled', () => { UI.installEvt = null; rerender(); toast('App installée sur l\'écran d\'accueil'); });
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+// Updates: a new version installs in the background and waits; the app shows a banner,
+// and one tap activates it and reloads.
+let swReg = null;
+function watchWorker(w) {
+  if (!w) return;
+  const check = () => { if (w.state === 'installed' && navigator.serviceWorker.controller) { UI.updateReady = w; rerender(); } };
+  check(); w.addEventListener('statechange', check);
+}
+function applyUpdate() {
+  const w = UI.updateReady || (swReg && swReg.waiting);
+  if (!w) { location.reload(); return; }
+  UI.applyingUpdate = true;
+  w.postMessage({ type: 'SKIP_WAITING' });
+  setTimeout(() => location.reload(), 3000); // fallback if the switch event never arrives
+}
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { }));
+  window.addEventListener('load', async () => {
+    try {
+      swReg = await navigator.serviceWorker.register('sw.js');
+      if (swReg.waiting) watchWorker(swReg.waiting);
+      swReg.addEventListener('updatefound', () => watchWorker(swReg.installing));
+      swReg.update().catch(() => { });
+    } catch (e) { }
+  });
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (UI.applyingUpdate && !reloading) { reloading = true; location.reload(); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && swReg) swReg.update().catch(() => { }); });
 }
 
 /* ---------- Derived data ---------- */
@@ -692,6 +717,7 @@ function pendingReview() {
 }
 function renderBanners() {
   const out = [];
+  if (UI.updateReady) out.push(`<div class="banner" style="border-color:var(--accent)"><span>Une nouvelle version d'Expy est prête.</span><button class="btn" data-act="apply-update">Mettre à jour</button></div>`);
   const rv = pendingReview();
   if (rv) {
     const left = rv.amount - sumC(itemsIn(rv));
@@ -1097,7 +1123,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.2.1</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.3</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -1429,6 +1455,7 @@ document.addEventListener('click', (e) => {
     case 'period-new': sheetPeriod(null); break;
     case 'wish-new': sheetWish(null); break;
     case 'review': sheetReview(t.dataset.id); break;
+    case 'apply-update': t.disabled = true; t.textContent = 'Mise à jour…'; applyUpdate(); break;
     case 'review-later': { const rv = pendingReview(); if (rv) UI.reviewLater = rv.id; renderBanners(); break; }
     case 'wish-edit': sheetWish(t.dataset.id); break;
     case 'wish-settings': sheetWishSettings(); break;
