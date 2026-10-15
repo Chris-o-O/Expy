@@ -2,7 +2,7 @@
 <html lang="fr-CA">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>Expy</title>
 <meta name="description" content="Saisie de dépenses en 2 secondes, seuil par période et suivi de dettes.">
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
@@ -108,21 +108,53 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .mini .v { font-size: 18px; font-weight: 800; }
 .mini .s { font-size: 12px; color: var(--hero-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini.home .v { color: var(--hero-home); }
-.set-th { width: 100%; border: 1.5px dashed var(--hero-sub); background: transparent; border-radius: 18px; padding: 10px; font-weight: 700; color: var(--hero-link); }
+.set-th { width: 100%; border: 1.5px dashed var(--line); background: transparent; border-radius: 18px; padding: 12px; font-weight: 700; color: var(--accent); }
 
 /* Entry */
 .entry { display: flex; flex-direction: column; gap: 10px; }
-.amount { display: flex; align-items: baseline; justify-content: center; gap: 6px; padding-block: 2px 0; min-height: 54px; }
-.amount .big { font-size: 50px; font-weight: 800; letter-spacing: -.05em; line-height: 1.1; }
-.amount .big.is-empty { color: var(--muted); opacity: .5; }
-.amount .cur { font-size: 26px; font-weight: 700; color: var(--muted); }
+/* Home: dial */
+.homehead { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; min-height: 26px; }
+#v-home { gap: 8px; }
+.homehead .per { font-size: 13px; font-weight: 700; color: var(--muted); border: 0; background: transparent; padding: 0; }
+.daypill { font-size: 12px; font-weight: 800; background: var(--fg); color: var(--bg); padding: 5px 11px; border-radius: 999px; }
+:root { --c-debt: #8B3DFF; --c-save: #12A150; }
+.dial { --d: min(222px, 26vh); --d: min(222px, 26dvh); position: relative; width: var(--d); height: var(--d); margin: 0 auto; container-type: inline-size; flex: none; }
+.dial svg { width: 100%; height: 100%; display: block; }
+.dial-c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1cqw; padding-inline: 13cqw; }
+.dial-k { font-size: 4.6cqw; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 1.5cqw; }
+.dial-k svg { width: 5.6cqw; height: 5.6cqw; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.amount { display: flex; align-items: baseline; justify-content: center; gap: 1.5cqw; min-width: 0; max-width: 100%; }
+.amount.can-kb { cursor: text; }
+.amount .big { font-size: 21.7cqw; font-weight: 800; letter-spacing: -.05em; line-height: 1.1; border: 0; background: transparent; padding: 0; margin: 0; text-align: center; color: var(--fg); outline: none; caret-color: var(--accent); min-width: 1ch; max-width: 100%; width: auto; border-radius: 0; field-sizing: content; }
+.amount .big::placeholder { color: var(--muted); opacity: .5; }
+.amount[data-l="l"] .big { font-size: 16cqw; }
+.amount[data-l="xl"] .big { font-size: 12.5cqw; }
+.amount .cur { font-size: 9cqw; font-weight: 700; color: var(--muted); }
+.dial-n { font-size: 5.4cqw; font-weight: 700; min-height: 1.3em; text-align: center; white-space: nowrap; }
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; font-size: 12.5px; font-weight: 700; color: var(--muted); border: 0; background: transparent; width: 100%; padding: 0; }
+.legend[hidden] { display: none; }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+.legend .lk { color: var(--accent); }
+.stats3 { display: flex; gap: 8px; }
+.stat { flex: 1; min-width: 0; background: var(--surface-2); border-radius: 16px; padding: 7px 12px; border: 0; text-align: left; display: flex; flex-direction: column; }
+.stat .k { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font-size: 17px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat.home { background: #FFD9B8; color: #0A0A0A; }
+.stat.home .k { color: #4A4A4A; }
+.sheet .row .d { white-space: normal; }
+.form label.chk { flex-direction: row; align-items: center; font-size: 14px; color: var(--fg); font-weight: 600; }
+.nat-add { display: none; }
+body.kb .nat-add { display: block; }
+body.kb .keypad, body.kb .tabs, body.kb #banners, body.kb .stats3, body.kb .legend, body.kb .homehead, body.kb #recentHead, body.kb #recent { display: none; }
+body.kb .dial { --d: min(150px, 24vh); --d: min(150px, 24dvh); }
+body.kb .wrap { padding-bottom: 16px; }
 .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-block: 2px; margin-inline: -16px; padding-inline: 16px; }
 .chips::-webkit-scrollbar { display: none; }
 .chip { flex: none; display: inline-flex; align-items: center; gap: 7px; border: 1.5px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 14px 8px 11px; font-weight: 600; font-size: 14.5px; white-space: nowrap; }
 .chip .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .chip[aria-pressed="true"] { border-color: var(--fg); background: var(--fg); color: var(--bg); }
 /* Category tiles with icons: two rows, scroll sideways */
-.tiles { display: grid; grid-template-rows: repeat(2, 56px); grid-auto-flow: column; grid-auto-columns: calc((100% - 32px) / 5); gap: 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; }
+.tiles { display: grid; grid-template-rows: repeat(2, 52px); grid-auto-flow: column; grid-auto-columns: calc((100% - 32px) / 5); gap: 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; }
 .tiles::-webkit-scrollbar { display: none; }
 .tile { scroll-snap-align: start; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 18px; background: var(--surface); padding: 0; min-width: 0; }
 .tile .ico { width: 34px; height: 34px; }
@@ -141,7 +173,7 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .opts { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .field { width: 100%; min-width: 0; border: 1.5px solid var(--line); background: var(--surface); border-radius: 14px; padding: 9px 12px; font-size: 15px; }
 .field:focus { border-color: var(--accent); outline: none; }
-.keypad { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 50px; gap: 8px; }
+.keypad { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: clamp(40px, 5.6vh, 46px); grid-auto-rows: clamp(40px, 5.6dvh, 46px); gap: 8px; }
 .keypad button { border: 0; border-radius: 16px; background: var(--key); box-shadow: var(--shadow); font-family: var(--f-num); font-size: 24px; font-weight: 700; user-select: none; }
 .keypad button:active { background: var(--key-press); }
 .keypad .zero { grid-column: 1 / span 3; }
@@ -288,16 +320,25 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .sheet .chips { flex-wrap: wrap; overflow: visible; margin-inline: 0; padding-inline: 0; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-@media (max-height: 760px) { .keypad { grid-auto-rows: 44px; } .amount .big { font-size: 42px; } .amount { min-height: 46px; } .tiles { grid-template-rows: repeat(2, 50px); } }
+@media (max-height: 760px) { .stat { padding-block: 5px; } .keypad { grid-auto-rows: 42px; } .tiles { grid-template-rows: repeat(2, 46px); } }
 </style>
 </head>
 <body>
 <div class="wrap" id="app">
   <section id="v-home" class="view">
-    <div id="summary" class="summary" aria-live="polite"></div>
     <div id="banners" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div class="homehead" id="homeHead"></div>
+    <div class="dial" id="dial">
+      <svg id="ring" viewBox="0 0 240 240" role="img" aria-label="Budget de la période"></svg>
+      <div class="dial-c">
+        <div class="dial-k" id="dialK">Saisie</div>
+        <div class="amount" id="amount" data-act="native-kb"><input class="big num" id="amtIn" type="text" inputmode="none" readonly autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="0" aria-label="Montant de la dépense"><span class="cur">$</span></div>
+        <div class="dial-n" id="dialN" aria-live="polite"></div>
+      </div>
+    </div>
+    <button class="legend" id="legend" data-act="goals" hidden></button>
+    <div class="stats3" id="stats3"></div>
     <div class="entry">
-      <div class="amount" id="amount" aria-live="polite"><span class="big num is-empty">0</span><span class="cur">$</span></div>
       <div class="tiles" id="chips" role="group" aria-label="Catégorie"></div>
       <div class="opts-row">
         <button class="toggle" id="homeToggle" data-act="toggle-home" aria-pressed="false"><span class="sw"></span>Faisable à la maison</button>
@@ -313,8 +354,9 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
         <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button class="add" id="addBtn" data-act="add" disabled>Ajouter</button>
         <button class="zero" data-k="0">0</button>
       </div>
+      <button class="btn block nat-add" id="addBtn2" data-act="add" disabled>Ajouter</button>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:baseline;padding-top:6px"><h2>Dernières dépenses</h2><button class="link" data-act="tab" data-tab="stats">Tout le mois</button></div>
+    <div id="recentHead" style="display:flex;justify-content:space-between;align-items:baseline;padding-top:6px"><h2>Dernières dépenses</h2><button class="link" data-act="tab" data-tab="stats">Tout le mois</button></div>
     <div id="recent"></div>
   </section>
   <section id="v-debts" class="view" hidden></section>
@@ -443,6 +485,7 @@ function defaultSettings() {
     wishes: [], wishCushion: 0, wishRate: null, wishAfterDebts: false,
     leftoverToDebt: true, reviewed: {},
     alerts: {}, lastExport: null, theme: 'auto',
+    goals: [], debtReserve: false, debtGoalBy: null, debtSince: null, kb: 'native',
   };
 }
 const DEFAULT_CATS = [
@@ -514,6 +557,12 @@ function normalize(st) {
     s.catsV = 3;
   }
   if (!['auto', 'light', 'dark'].includes(s.theme)) s.theme = 'auto';
+  if (!Array.isArray(s.goals)) s.goals = [];
+  s.goals = s.goals.filter(g => g && typeof g.target === 'number' && g.target > 0 && typeof g.by === 'string')
+    .map(g => Object.assign({ id: 'g' + uid(), name: 'Objectif' }, g, { saved: Math.max(0, +g.saved || 0) }));
+  s.debtReserve = !!s.debtReserve;
+  if (typeof s.debtGoalBy !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s.debtGoalBy)) s.debtGoalBy = null;
+  if (s.kb !== 'app') s.kb = 'native';
   s.v = 2;
   return s;
 }
@@ -666,6 +715,30 @@ function suggestCat(amtC) {
   return last ? last.cat : (catOrder()[0] || {}).id;
 }
 function level(total, th) { if (!th) return 0; const p = total / th; return p >= 1 ? 100 : p >= 0.8 ? 80 : 0; }
+/* Reserve: part of each period's threshold set aside for debts and savings goals.
+   Prorated by the period length: remaining amount x period days / days until the target date.
+   Debts: with a "debt-free by" date, the balance is spread to that date; without one, the monthly repayment budget is prorated. */
+const DAYS_MO = 30.4375;
+function reserveFor(p) {
+  const s = S.settings, L = periodLen(p);
+  const spanTo = (by) => Math.max(L, daysBetween(p.start, by) + 1);
+  const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
+  let debt = 0;
+  if (s.debtReserve && bal > 0 && !(s.debtSince && p.end < s.debtSince)) {
+    if (s.debtGoalBy && s.debtGoalBy >= p.start) debt = bal * L / spanTo(s.debtGoalBy);
+    else if (s.debtBudget > 0) debt = s.debtBudget * L / DAYS_MO;
+    debt = Math.min(Math.round(debt), bal);
+  }
+  const goals = [];
+  for (const g of s.goals) {
+    const rem = g.target - g.saved;
+    if (rem <= 0 || g.by < p.start || (g.created && p.end < g.created)) continue;
+    const amt = Math.min(Math.round(rem * L / spanTo(g.by)), rem);
+    if (amt > 0) goals.push({ id: g.id, name: g.name, amt });
+  }
+  const save = goals.reduce((a, g) => a + g.amt, 0);
+  return { debt, goals, save, total: debt + save };
+}
 // Average monthly amount left under the threshold (finished periods), added to debt repayment when enabled.
 function leftoverExtra() {
   const s = S.settings;
@@ -685,16 +758,24 @@ function amtCents() {
   const [i, d = ''] = UI.amt.split(',');
   return (parseInt(i || '0', 10) * 100) + parseInt((d + '00').slice(0, 2), 10);
 }
+const fmtAmt = (raw) => { if (!raw) return ''; const [i, d] = raw.split(','); return (i || '0').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + (d !== undefined ? ',' + d : ''); };
+const KB_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9"/></svg>';
+const FIELD_SIZING = !!(window.CSS && CSS.supports && CSS.supports('field-sizing', 'content'));
+const canKb = () => S.settings.kb !== 'app' && !UI.kbFail;
 function renderAmount() {
-  const el = $('#amount .big');
-  if (!UI.amt) { el.textContent = '0'; el.classList.add('is-empty'); }
-  else {
-    const [i, d] = UI.amt.split(',');
-    const grouped = (i || '0').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-    el.textContent = grouped + (d !== undefined ? ',' + d : '');
-    el.classList.remove('is-empty');
-  }
-  $('#addBtn').disabled = amtCents() <= 0;
+  const inp = $('#amtIn'), editing = document.activeElement === inp && !inp.readOnly;
+  const txt = editing ? UI.amt : fmtAmt(UI.amt);
+  if (inp.value !== txt) inp.value = txt;
+  if (!FIELD_SIZING) inp.style.width = 'calc(' + Math.max(1, txt.length) + 'ch + .15em)';
+  $('#amount').dataset.l = txt.length > 8 ? 'xl' : txt.length > 5 ? 'l' : '';
+  $('#amount').classList.toggle('can-kb', canKb());
+  $('#dialK').innerHTML = 'Saisie' + (canKb() ? KB_SVG : '');
+  const ok = amtCents() > 0; $('#addBtn').disabled = !ok; $('#addBtn2').disabled = !ok;
+  renderRing();
+}
+function amtChanged() {
+  if (!UI.catPicked) { UI.cat = suggestCat(amtCents()); if (!UI.homePicked) UI.home = !!catById(UI.cat).home; renderChips(); renderHomeToggle(); }
+  renderAmount();
 }
 function key(k) {
   let a = UI.amt;
@@ -706,9 +787,50 @@ function key(k) {
     a = (a === '0' ? '' : a) + k;
   }
   UI.amt = a;
-  if (!UI.catPicked) { UI.cat = suggestCat(amtCents()); if (!UI.homePicked) UI.home = !!catById(UI.cat).home; renderChips(); renderHomeToggle(); }
+  amtChanged();
+}
+// Typing with the device keyboard
+function onNativeInput(inp) {
+  let v = inp.value.replace(/\s/g, '').replace(/\./g, ',').replace(/[^0-9,]/g, '');
+  const ci = v.indexOf(',');
+  if (ci >= 0) v = v.slice(0, ci + 1) + v.slice(ci + 1).replace(/,/g, '').slice(0, 2);
+  let [i, d] = v.split(',');
+  i = i.replace(/^0+(?=\d)/, '').slice(0, 6);
+  if (d !== undefined && i === '') i = '0';
+  v = d !== undefined ? i + ',' + d : i;
+  UI.amt = v; inp.value = v;
+  amtChanged();
+}
+const viewH = () => Math.min(window.innerHeight, window.visualViewport ? window.visualViewport.height : Infinity);
+// Tap on the amount: try the device's numeric keyboard; if it does not appear, fall back to the in-app keypad.
+function startNative() {
+  const inp = $('#amtIn');
+  if (UI.tab !== 'home' || !canKb() || !inp.readOnly) return;
+  const h0 = viewH();
+  UI.kbH0 = h0; UI.kbOK = false;
+  inp.blur();
+  inp.readOnly = false; inp.setAttribute('inputmode', 'decimal');
+  document.body.classList.add('kb');
+  inp.focus();
+  const end = inp.value.length; try { inp.setSelectionRange(end, end); } catch (e) {}
+  renderAmount();
+  const t0 = Date.now();
+  const iv = setInterval(() => {
+    if (inp.readOnly || document.activeElement !== inp) { clearInterval(iv); return; }
+    if (viewH() < h0 - 100) { clearInterval(iv); UI.kbOK = true; return; }
+    if (Date.now() - t0 > 900) { clearInterval(iv); endNative(true); }
+  }, 100);
+}
+function endNative(fail) {
+  const inp = $('#amtIn');
+  if (fail) UI.kbFail = true;
+  inp.readOnly = true; inp.setAttribute('inputmode', 'none');
+  if (document.activeElement === inp) inp.blur();
+  document.body.classList.remove('kb');
+  UI.kbOK = false;
   renderAmount();
 }
+const nativeOn = () => document.body.classList.contains('kb');
 function renderChips() {
   const cats = catOrder();
   if (!UI.cat || !S.settings.cats.some(c => c.id === UI.cat)) UI.cat = suggestCat(0);
@@ -724,6 +846,7 @@ function renderHomeToggle() { $('#homeToggle').setAttribute('aria-pressed', Stri
 function resetEntry() {
   UI.amt = ''; UI.catPicked = false; UI.homePicked = false; UI.cat = suggestCat(0); UI.home = !!catById(UI.cat).home;
   $('#noteIn').value = ''; $('#dateIn').value = todayISO();
+  if (nativeOn()) endNative(false);
   UI.optsOpen = false; $('#opts').hidden = true; $('#optsBtn').setAttribute('aria-expanded', 'false');
   renderAmount(); renderChips(); renderHomeToggle();
 }
@@ -762,46 +885,72 @@ function addExpense() {
 }
 
 /* ---------- Home render ---------- */
+const RING_C = 2 * Math.PI * 100;
+function homeState() {
+  const today = todayISO(), per = activePeriod(), mk = curMonth();
+  const items = per ? itemsIn(per) : itemsOf(mk);
+  const spent = sumC(items), homeC = sumC(items.filter(i => i.home));
+  if (!per) return { per: null, spent, homeC, label: cap(monthLabel(mk)) };
+  const len = periodLen(per), elapsed = daysBetween(per.start, today) + 1, daysLeft = len - elapsed + 1;
+  const rs = reserveFor(per), free = per.amount - rs.total;
+  return { per, spent, homeC, len, elapsed, daysLeft, rs, free, left: free - spent, amount: per.amount, label: rangeLabel(per) };
+}
 function renderSummary() {
-  const mk = curMonth(), today = todayISO();
-  const per = activePeriod();
-  const items = per ? itemsIn(per) : itemsOf(mk), total = sumC(items), th = per ? per.amount : null;
-  const homeC = sumC(items.filter(i => i.home));
-  let gauge, line, label;
-  if (per) {
-    const len = periodLen(per), elapsed = daysBetween(per.start, today) + 1, daysLeft = len - elapsed + 1;
-    const p = total / th, cls = p >= 1 ? 'bad' : p >= 0.8 ? 'warn' : '';
-    const pace = (elapsed - 0.5) / len;
-    label = rangeLabel(per);
-    gauge = `<button class="gauge ${cls}" data-act="edit-th" aria-label="Modifier la période et le seuil" style="border:0;padding:0;display:block;width:100%"><i style="width:${Math.min(p, 1) * 100}%"></i><b style="left:calc(${(pace * 100).toFixed(1)}% - 1px)" title="Rythme régulier"></b></button>`;
-    if (p >= 1) line = `<span class="st-bad">Dépassé de ${money(total - th)}</span><span class="muted mono">${daysLeft} j restants</span>`;
-    else line = `<span class="${p >= 0.8 ? 'st-warn' : 'st-ok'}">Il reste ${money(th - total)}</span><span class="muted mono">${money((th - total) / daysLeft)}/jour · ${daysLeft} j</span>`;
+  const h = homeState(); UI.hs = h;
+  $('#homeHead').innerHTML = h.per
+    ? `<button class="per" data-act="edit-th" aria-label="Modifier la période et le seuil">${esc(h.label)}</button><span class="daypill">Jour ${h.elapsed} / ${h.len}</span>`
+    : `<span class="per">${esc(h.label)}</span>`;
+  const lg = $('#legend'), st = $('#stats3');
+  if (h.per) {
+    const dot = (c) => `<i style="background:${c}"></i>`, rs = h.rs;
+    lg.hidden = false;
+    lg.innerHTML = `<span>${dot('var(--fg)')}Dépensé ${money0(h.spent)}</span>`
+      + (rs.debt ? `<span>${dot('var(--c-debt)')}Dettes ${money0(rs.debt)}</span>` : '')
+      + (rs.save ? `<span>${dot('var(--c-save)')}Épargne ${money0(rs.save)}</span>` : '')
+      + `<span class="lk" aria-label="Objectifs">›</span>`;
+    const col = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--ok)';
+    const perDay = h.left > 0 && h.daysLeft > 0 ? money0(h.left / h.daysLeft) : '—';
+    st.innerHTML = `<button class="stat" data-act="edit-th"><span class="k">Reste</span><span class="v num" style="color:${col}">${money0(h.left)}</span></button>
+      <div class="stat"><span class="k">Par jour</span><span class="v num">${perDay}</span></div>
+      <button class="stat home" data-act="tab" data-tab="stats"><span class="k">Maison</span><span class="v num">${money0(h.homeC)}</span></button>`;
   } else {
-    label = cap(monthLabel(mk));
-    gauge = `<button class="set-th" data-act="edit-th">Définir une période et un seuil</button>`;
-    line = '';
+    lg.hidden = true; lg.innerHTML = '';
+    st.innerHTML = `<button class="set-th" data-act="edit-th">Définir une période et un seuil</button>`;
   }
-  const s = S.settings;
-  let debtMini;
-  if (s.debts.some(d => d.bal > 0)) {
-    const sim = debtSim();
-    const totalDebt = s.debts.reduce((a, d) => a + d.bal, 0);
-    debtMini = `<button class="mini" data-act="tab" data-tab="debts"><span class="k">Dettes</span><span class="v num">${money0(totalDebt)}</span><span class="s">${sim.short ? 'Budget sous les minimums' : 'Libre en ' + payoffLabel(sim.months)}</span></button>`;
+  renderRing();
+}
+function renderRing() {
+  const h = UI.hs; if (!h) return;
+  const e = amtCents(), C = RING_C;
+  const arc = (a, l, color, cap) => l > 0.0004 ? `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" stroke-linecap="${cap || 'butt'}" style="stroke:${color}" stroke-dasharray="${(l * C).toFixed(1)} ${(C - l * C + 2).toFixed(1)}" stroke-dashoffset="${(-a * C).toFixed(1)}" transform="rotate(-90 120 120)"/>` : '';
+  let svg = `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" style="stroke:var(--surface-2)"/>`, note, label;
+  if (h.per) {
+    const A = h.amount, rs = h.rs;
+    const fs = Math.min(rs.save / A, 1), fd = Math.min(rs.debt / A, 1 - fs);
+    svg += arc(1 - fs, fs, 'var(--c-save)') + arc(1 - fs - fd, fd, 'var(--c-debt)');
+    const sp = Math.min(h.spent / A, 1);
+    const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)';
+    svg += arc(0, sp, hot, 'round');
+    if (e > 0) svg += arc(sp, Math.min(e / A, 1 - sp), catById(UI.cat).color, 'round');
+    if (h.free > 0) {
+      const ang = ((h.free * (h.elapsed - 0.5) / h.len) / A) * 2 * Math.PI - Math.PI / 2, cx = Math.cos(ang), cy = Math.sin(ang);
+      svg += `<line x1="${(120 + 87 * cx).toFixed(1)}" y1="${(120 + 87 * cy).toFixed(1)}" x2="${(120 + 113 * cx).toFixed(1)}" y2="${(120 + 113 * cy).toFixed(1)}" stroke-width="4" stroke-linecap="round" style="stroke:var(--accent)"/>`;
+    }
+    if (e > 0) {
+      const after = h.left - e;
+      note = after >= 0 ? `<span style="color:${h.free > 0 && h.spent + e >= .8 * h.free ? 'var(--warn)' : 'var(--ok)'}">→ reste ${money(after)}</span>` : `<span style="color:var(--bad)">→ dépasse de ${money(-after)}</span>`;
+    } else note = `<span class="muted">sur ${money0(h.free)} libres</span>`;
+    label = `${Math.round(h.spent / A * 100)} % du seuil dépensé${rs.total ? ', ' + Math.round(rs.total / A * 100) + ' % réservé' : ''}`;
   } else {
-    debtMini = `<button class="mini" data-act="tab" data-tab="debts"><span class="k">Dettes</span><span class="v num">0 $</span><span class="s">Ajouter une dette</span></button>`;
+    note = `<span class="muted">${esc(h.label)} : ${money0(h.spent)}</span>`; label = 'Aucune période définie';
   }
-  const homeMini = `<button class="mini home" data-act="tab" data-tab="stats"><span class="k">Faisable maison</span><span class="v num">${money0(homeC)}</span><span class="s">${total ? PCT.format(homeC / total) + (homeC ? ' · sans : ' + money0(total - homeC) : (per ? ' de la période' : ' du mois')) : 'Rien pour l\'instant'}</span></button>`;
-  $('#summary').innerHTML = `
-    <div class="sum-top"><span class="sum-month">${esc(label)}</span><button class="link" data-act="edit-th" style="padding:0">${th ? 'Seuil ' + money0(th) : ''}</button></div>
-    <div class="sum-total num">${money(total)}${th ? ` <span class="sum-of">/ ${money0(th)}</span>` : ''}</div>
-    ${gauge}
-    ${line ? `<div class="sum-line">${line}</div>` : ''}
-    <div class="minis">${homeMini}${debtMini}</div>`;
+  $('#ring').innerHTML = svg; $('#ring').setAttribute('aria-label', label);
+  $('#dialN').innerHTML = note;
 }
 // The latest finished period whose debts have not been updated yet (shown the day after it ends).
 function pendingReview() {
   const s = S.settings, today = todayISO();
-  if (!s.debts.some(d => d.bal > 0)) return null;
+  if (!s.debts.some(d => d.bal > 0) && !s.goals.some(g => g.target - g.saved > 0)) return null;
   const p = s.periods.filter(x => x.end < today && !x.ex).sort((a, b) => b.end.localeCompare(a.end))[0];
   if (!p || s.reviewed[p.id] || UI.reviewLater === p.id) return null;
   return p;
@@ -811,12 +960,12 @@ function renderBanners() {
   if (UI.updateReady) out.push(`<div class="banner" style="border-color:var(--accent)"><span>Une nouvelle version d'Expy est prête.</span><button class="btn" data-act="apply-update">Mettre à jour</button></div>`);
   const rv = pendingReview();
   if (rv) {
-    const left = rv.amount - sumC(itemsIn(rv));
+    const left = rv.amount - reserveFor(rv).total - sumC(itemsIn(rv));
     out.push(`<div class="banner warn" style="flex-direction:column;align-items:stretch;gap:8px">
-      <span><b>Période du ${esc(shortDate(rv.start))} au ${esc(shortDate(rv.end))} terminée.</b> ${left >= 0 ? `Il te reste ${money(left)} sous le seuil.` : `Seuil dépassé de ${money(-left)}.`} As-tu remboursé ta carte ? Mets tes soldes à jour.</span>
+      <span><b>Période du ${esc(shortDate(rv.start))} au ${esc(shortDate(rv.end))} terminée.</b> ${left >= 0 ? `Il te reste ${money(left)} sous le seuil.` : `Seuil dépassé de ${money(-left)}.`} ${S.settings.debts.some(d => d.bal > 0) ? 'As-tu remboursé ta carte ? Mets tes soldes à jour.' : 'Verse la part réservée à tes objectifs.'}</span>
       <span style="display:flex;gap:8px;justify-content:flex-end"><button class="link" data-act="review-later">Plus tard</button><button class="btn" data-act="review" data-id="${esc(rv.id)}">Mettre à jour</button></span></div>`);
   }
-  const hasEx = allItems().some(i => i.ex) || S.settings.debts.some(d => d.ex) || S.settings.wishes.some(w => w.ex);
+  const hasEx = allItems().some(i => i.ex) || S.settings.debts.some(d => d.ex) || S.settings.wishes.some(w => w.ex) || S.settings.goals.some(g => g.ex);
   if (hasEx) out.push(`<div class="banner ex"><span>Données d'exemple affichées.</span><button class="link" data-act="clear-demo">Tout effacer</button></div>`);
   const anyData = allItems().length || S.settings.debts.length;
   if (!anyData) out.push(`<div class="banner"><span>Pour voir l'outil rempli, charge des dépenses et des dettes d'exemple.</span><button class="link" data-act="load-demo">Exemple</button></div>`);
@@ -876,6 +1025,7 @@ function renderDebts() {
     </div>
     <div class="note" id="budgetNote">${budgetNoteText(s.debtBudget, sumMin)}</div>
     <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="leftoverToggle" ${s.leftoverToDebt ? 'checked' : ''}>Ajouter le reste de chaque période sous le seuil</label>
+    <button class="link" data-act="goals" style="text-align:left;padding:0">${s.debtReserve ? 'Une part de chaque période est réservée aux dettes' : 'Réserver une part de chaque période'} · Objectifs ›</button>
     ${sim.short ? `<div class="warntext">Le budget est sous la somme des minimums (${money(sumMin)}).</div>` : ''}
     ${sim.never && !sim.short ? `<div class="warntext">À ce budget, au moins une dette ne sera jamais remboursée.</div>` : ''}
     <div class="seg" role="group" aria-label="Méthode">
@@ -1019,7 +1169,7 @@ function autoLeftover() {
   const done = S.settings.periods.filter(p => p.end < today).sort((a, b) => b.end.localeCompare(a.end)).slice(0, 6);
   if (!done.length) return null;
   let left = 0, days = 0;
-  for (const p of done) { left += p.amount - sumC(itemsIn(p)); days += periodLen(p); }
+  for (const p of done) { left += p.amount - reserveFor(p).total - sumC(itemsIn(p)); days += periodLen(p); }
   const perDay = left / days;
   return { perDay, monthly: Math.round(perDay * 30.4375), n: done.length };
 }
@@ -1177,6 +1327,13 @@ function sheetWishSettings() {
 }
 
 /* ---------- Settings view ---------- */
+function goalsSummary() {
+  const p = activePeriod();
+  if (!p) return 'Réserve automatiquement une part du seuil de chaque période pour tes dettes et ton épargne.';
+  const rs = reserveFor(p);
+  if (!rs.total) return 'Réserve automatiquement une part du seuil de chaque période pour tes dettes et ton épargne.';
+  return `Cette période : ${money0(rs.total)} réservés sur ${money0(p.amount)} (dettes ${money0(rs.debt)}, épargne ${money0(rs.save)}).`;
+}
 function renderSettings() {
   const s = S.settings;
   const periods = s.periods.slice().sort((a, b) => b.start.localeCompare(a.start));
@@ -1196,7 +1353,7 @@ function renderSettings() {
   const status = 'Tes données restent sur ce téléphone, sans compte ni synchronisation.'
     + (S.persisted === true ? ' Stockage protégé : Chrome ne les effacera pas pour libérer de l\'espace.' : S.persisted === false ? ' Chrome n\'a pas encore protégé le stockage ; installer l\'app aide.' : '')
     + ' Exporte une sauvegarde chaque mois, et avant de changer de téléphone ou de vider les données de Chrome.';
-  const hasEx = allItems().some(i => i.ex) || s.debts.some(d => d.ex) || s.wishes.some(w => w.ex);
+  const hasEx = allItems().some(i => i.ex) || s.debts.some(d => d.ex) || s.wishes.some(w => w.ex) || s.goals.some(g => g.ex);
   $('#v-settings').innerHTML = `
     <div class="view-head"><h1>Réglages</h1></div>
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Périodes et seuils</h2><button class="btn ghost" data-act="period-new">Ajouter</button></div>
@@ -1204,11 +1361,18 @@ function renderSettings() {
       ${thRows}${periods.length > 12 ? `<div class="note">${periods.length - 12} périodes plus anciennes.</div>` : ''}</div>
     <div class="card"><h2>Catégories</h2><div class="note">Touche l'icône pour changer l'icône et la couleur. Seuil facultatif par catégorie. « Faisable maison » coche la bascule par défaut à la saisie.</div><div>${catRows}</div>
       <div style="display:grid;grid-template-columns:1fr auto;gap:8px"><input class="field" id="newCat" maxlength="24" placeholder="Nouvelle catégorie"><button class="btn ghost" data-act="cat-add">Ajouter</button></div></div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Objectifs</h2><button class="btn ghost" data-act="goals">Gérer</button></div>
+      <div class="note">${goalsSummary()}</div></div>
     <div class="card"><h2>Apparence</h2>
       <div class="seg three" role="group" aria-label="Thème">
         ${[['auto', 'Auto'], ['light', 'Clair'], ['dark', 'Sombre']].map(([v, l]) => `<button data-act="theme" data-t="${v}" aria-pressed="${s.theme === v}">${l}</button>`).join('')}
       </div>
       <div class="note">Auto suit le réglage de ton téléphone.</div>
+      <h2 style="margin-top:6px">Clavier de saisie</h2>
+      <div class="seg" role="group" aria-label="Clavier">
+        ${[['native', 'Appareil'], ['app', 'Intégré']].map(([v, l]) => `<button data-act="kb-pref" data-v="${v}" aria-pressed="${s.kb === v}">${l}</button>`).join('')}
+      </div>
+      <div class="note">Appareil : touche le montant pour ouvrir le clavier numérique du téléphone. S'il ne s'ouvre pas, le pavé intégré reste affiché.</div>
     </div>
     <div class="card"><h2>Données</h2><div class="note">${esc(status)}</div>
       <div class="btn-row">
@@ -1223,7 +1387,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.5.1</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.6</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -1232,6 +1396,67 @@ function closeSheet() { $('#sheet').hidden = true; $('#sheetPanel').innerHTML = 
 
 // Edit a budget period, or create one (id null). Defaults for a new one: the day after the latest period,
 // for the same length and amount; with no period yet, the current calendar month.
+function sheetGoals() {
+  const s = S.settings, per = activePeriod();
+  const rs = per ? reserveFor(per) : null;
+  const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
+  let dnote = '';
+  if (bal > 0) {
+    if (s.debtGoalBy) dnote = `Pour être libre d'ici le ${shortDate(s.debtGoalBy, true)}, il faut environ ${money0(bal / Math.max(1, (daysBetween(todayISO(), s.debtGoalBy) + 1) / DAYS_MO))} par mois (sans les intérêts).`;
+    else if (s.debtBudget > 0) dnote = `Sans date, la réserve suit ton budget de remboursement : ${money0(s.debtBudget)} par mois.`;
+    else dnote = `Sans date et sans budget de remboursement, rien n'est réservé. Indique l'un des deux.`;
+  }
+  const rows = s.goals.map(g => {
+    const a = rs ? (rs.goals.find(x => x.id === g.id) || { amt: 0 }).amt : 0;
+    const over = g.by < todayISO() && g.target > g.saved;
+    return `<li><button class="row" data-act="goal-edit" data-id="${esc(g.id)}" style="padding-inline:0"><span class="main"><span class="t">${esc(g.name)}${g.ex ? ' <span class="tag ex">ex.</span>' : ''}</span><span class="d">${money0(g.saved)} sur ${money0(g.target)} · ${over ? 'échéance passée' : 'd\'ici le ' + esc(shortDate(g.by, true))}${rs && a ? ' · ' + money0(a) + ' cette période' : ''}</span></span><span class="muted">›</span></button></li>`;
+  }).join('');
+  openSheet(`<h1>Objectifs et réserve</h1>
+    <div class="note">Chaque période, une part du seuil est mise de côté, en proportion de sa durée. Elle est retirée de ce que tu peux dépenser et apparaît dans le cadran.</div>
+    ${rs ? `<div class="card"><div class="kv">
+      <div><span class="k">Seuil</span><span class="v num">${money0(per.amount)}</span></div>
+      <div><span class="k">Réservé</span><span class="v num">${money0(rs.total)}</span></div>
+      <div><span class="k">Libre</span><span class="v num">${money0(per.amount - rs.total)}</span></div>
+    </div><div class="note">Période de ${periodLen(per)} jours.</div></div>` : ''}
+    <div class="card"><h2>Dettes</h2>
+      ${bal > 0 ? `<label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="gDebtOn" ${s.debtReserve ? 'checked' : ''}>Réserver pour rembourser mes dettes (${money0(bal)})</label>
+      <label class="form" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:700;color:var(--muted)">Libre de dettes d'ici (facultatif)<input class="field" id="gDebtBy" type="date" value="${esc(s.debtGoalBy || '')}"></label>
+      <div class="note">${esc(dnote)}</div>` : '<div class="note">Aucune dette suivie. Ajoute-en une dans l\'onglet Dettes.</div>'}
+    </div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Épargne</h2><button class="btn ghost" data-act="goal-new">Ajouter</button></div>
+      ${rows ? `<ul class="list" style="box-shadow:none;background:transparent">${rows}</ul>` : '<div class="note">Aucun objectif. Exemple : 1 200 $ d\'ici la fin de l\'année.</div>'}
+    </div>
+    <button class="btn block" data-act="close-sheet">Fermer</button>`);
+}
+function sheetGoal(id) {
+  const s = S.settings, g = id ? s.goals.find(x => x.id === id) : null;
+  const yEnd = new Date().getFullYear() + '-12-31';
+  openSheet(`<h1>${g ? esc(g.name) : "Nouvel objectif d'épargne"}</h1>
+    <form class="form" id="gForm">
+      <label>Nom<input class="field" id="gName" maxlength="30" value="${g ? esc(g.name) : ''}" placeholder="ex. Fonds d'urgence" ${g ? '' : 'autofocus'}></label>
+      <div class="two"><label>Montant visé ($)<input class="field num" id="gTarget" inputmode="decimal" value="${g ? esc(toInputMoney(g.target)) : ''}"></label>
+      <label>Déjà épargné ($)<input class="field num" id="gSaved" inputmode="decimal" value="${g ? esc(toInputMoney(g.saved)) : ''}" placeholder="0"></label></div>
+      <label>Échéance<input class="field" id="gBy" type="date" value="${esc(g ? g.by : yEnd)}"></label>
+      <div class="warntext" id="gErr" hidden></div>
+      <button class="btn block" type="submit">${g ? 'Enregistrer' : 'Ajouter'}</button>
+    </form>
+    ${g ? '<button class="btn danger block" id="gDel" type="button">Supprimer l\'objectif</button>' : ''}
+    <button class="btn ghost block" type="button" data-act="goals">Retour</button>`);
+  $('#gForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = $('#gName').value.trim(), target = parseMoney($('#gTarget').value), by = $('#gBy').value;
+    const savedRaw = $('#gSaved').value.trim(), saved = savedRaw === '' ? 0 : parseMoney(savedRaw);
+    const err = !name ? 'Donne un nom à l\'objectif.' : (target == null || isNaN(target) || target <= 0) ? 'Indique le montant visé.' : (saved == null || isNaN(saved)) ? 'Le montant déjà épargné est invalide.' : !by || by < todayISO() ? 'Choisis une échéance à partir d\'aujourd\'hui.' : '';
+    if (err) { $('#gErr').textContent = err; $('#gErr').hidden = false; return; }
+    if (g) Object.assign(g, { name, target, saved, by });
+    else s.goals.push({ id: 'g' + uid(), name, target, saved, by, created: todayISO() });
+    persist('settings'); rerender(); sheetGoals();
+  });
+  if (g) $('#gDel').addEventListener('click', () => {
+    if (UI.confirm !== 'gdel') { UI.confirm = 'gdel'; $('#gDel').textContent = 'Confirmer la suppression'; return; }
+    s.goals = s.goals.filter(x => x.id !== g.id); persist('settings'); rerender(); sheetGoals();
+  });
+}
 function sheetCatIcon(id) {
   const c = S.settings.cats.find(x => x.id === id); if (!c) return;
   const cur = catIconKey(c);
@@ -1398,7 +1623,8 @@ function sheetDebt(id) {
 function sheetReview(pid) {
   const s = S.settings, p = s.periods.find(x => x.id === pid);
   if (!p) return;
-  const spent = sumC(itemsIn(p)), left = p.amount - spent;
+  const rs = reserveFor(p), spent = sumC(itemsIn(p)), left = p.amount - rs.total - spent;
+  const payC = Math.max(0, left) + rs.debt;
   const active = s.debts.filter(d => d.bal > 0);
   const prio = debtSim().priority;
   const pd = active.find(d => d.id === prio) || active[0];
@@ -1407,19 +1633,26 @@ function sheetReview(pid) {
       <div><span class="k">Dépensé</span><span class="v num">${money0(spent)}</span></div>
       <div><span class="k">Seuil</span><span class="v num">${money0(p.amount)}</span></div>
       <div><span class="k">${left >= 0 ? 'Reste' : 'Dépassé'}</span><span class="v num" style="color:${left >= 0 ? 'var(--ok)' : 'var(--bad)'}">${money0(Math.abs(left))}</span></div>
-    </div><div class="note">Du ${esc(shortDate(p.start, true))} au ${esc(shortDate(p.end, true))}.</div></div>
+    </div><div class="note">Du ${esc(shortDate(p.start, true))} au ${esc(shortDate(p.end, true))}.${rs.total ? ` Réservé : ${money0(rs.total)}${rs.debt ? ' pour les dettes' : ''}${rs.debt && rs.save ? ' et' : ''}${rs.save ? ' pour l\'épargne' : ''}.` : ''}</div></div>
     <form class="form" id="rvForm">
-      <div class="note">Indique le solde de chaque dette aujourd'hui, d'après ton relevé ou ton appli bancaire.</div>
+      ${active.length ? `<div class="note">Indique le solde de chaque dette aujourd'hui, d'après ton relevé ou ton appli bancaire.</div>` : ''}
       ${active.map(d => `<label>${esc(d.name)} · solde avant : ${money(d.bal)}<input class="field num" id="rv-${esc(d.id)}" data-debt="${esc(d.id)}" inputmode="decimal" value="${esc(toInputMoney(d.bal))}"></label>`).join('')}
-      ${left > 0 && pd ? `<button type="button" class="btn ghost" id="rvApply">Déduire les ${money0(left)} restants de ${esc(pd.name)}</button>` : ''}
+      ${payC > 0 && pd ? `<button type="button" class="btn ghost" id="rvApply">Déduire ${money0(payC)} de ${esc(pd.name)}${rs.debt ? ' (reste + réserve)' : ''}</button>` : ''}
+      ${rs.save > 0 ? `<label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="rvSave" checked>Verser ${money0(rs.save)} à mes objectifs d'épargne</label>` : ''}
       <div class="warntext" id="rvErr" hidden></div>
       <button class="btn block" type="submit">Enregistrer les soldes</button>
       <button class="btn ghost block" type="button" id="rvNone">Rien à changer</button>
     </form>`);
-  if (left > 0 && pd) $('#rvApply').addEventListener('click', () => {
-    const f = $('#rv-' + pd.id); f.value = toInputMoney(Math.max(0, pd.bal - left));
+  if (payC > 0 && pd) $('#rvApply').addEventListener('click', () => {
+    const f = $('#rv-' + pd.id); f.value = toInputMoney(Math.max(0, pd.bal - payC));
   });
-  const done = (msg) => { s.reviewed[p.id] = new Date().toISOString(); persist(); closeSheet(); rerender(); if (msg) toast(msg); };
+  const done = (msg) => {
+    let sv = 0;
+    const cb = $('#rvSave');
+    if (cb && cb.checked) for (const g of rs.goals) { const o = s.goals.find(x => x.id === g.id); if (o) { o.saved = Math.min(o.target, o.saved + g.amt); sv += g.amt; } }
+    if (sv) msg = (msg ? msg + ' · ' : '') + `${money0(sv)} versés à l'épargne`;
+    s.reviewed[p.id] = new Date().toISOString(); persist(); closeSheet(); rerender(); if (msg) toast(msg);
+  };
   $('#rvNone').addEventListener('click', () => done(''));
   $('#rvForm').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1435,7 +1668,7 @@ function sheetReview(pid) {
       if (v !== d.bal) { d.bal = v; d.updated = new Date().toISOString(); }
     }
     const sim = debtSim();
-    done(`Soldes à jour${paid ? ` · ${money0(paid)} remboursés` : ''}${s.debts.some(d => d.bal > 0) ? ' · libre en ' + payoffLabel(sim.months) : ' · plus de dettes'}`);
+    done(active.length ? `Soldes à jour${paid ? ` · ${money0(paid)} remboursés` : ''}${s.debts.some(d => d.bal > 0) ? ' · libre en ' + payoffLabel(sim.months) : ' · plus de dettes'}` : '');
   });
 }
 
@@ -1515,6 +1748,8 @@ function loadDemo() {
   s.debts.push({ id: uid(), name: 'Visa', bal: 480000, apr: 20.99, min: 15000, updated: new Date().toISOString(), ex: true });
   s.debts.push({ id: uid(), name: 'Marge de crédit', bal: 250000, apr: 9.5, min: 7500, updated: new Date().toISOString(), ex: true });
   if (s.debtBudget < 50000) s.debtBudget = 50000;
+  s.goals.push({ id: 'g' + uid(), name: 'Voyage', target: 120000, saved: 20000, by: now.getFullYear() + '-12-31', created: isoOf(new Date(now.getFullYear(), now.getMonth() - 6, 1)), ex: true });
+  if (!s.debtReserve) { s.debtReserve = true; s.debtSince = isoOf(new Date(now.getFullYear(), now.getMonth() - 6, 1)); }
   s.wishes.push({ id: 'w' + uid(), name: 'Casque audio', price: 34900, added: todayISO(), ex: true });
   s.wishes.push({ id: 'w' + uid(), name: 'Fin de semaine à Québec', price: 60000, added: todayISO(), ex: true });
   persist('settings', ...touched);
@@ -1528,12 +1763,14 @@ function clearDemo() {
   s.payments = s.payments.filter(p => !exIds.includes(p.debtId));
   s.periods = s.periods.filter(p => !p.ex);
   s.wishes = s.wishes.filter(w => !w.ex);
-  if (!s.debts.length) s.debtBudget = 0;
+  s.goals = s.goals.filter(g => !g.ex);
+  if (!s.debts.length) { s.debtBudget = 0; s.debtReserve = false; s.debtGoalBy = null; s.debtSince = null; }
   persist(...keys); resetEntry(); rerender(); toast("Données d'exemple effacées");
 }
 
 /* ---------- Navigation & events ---------- */
 function showTab(tab) {
+  if (nativeOn()) endNative(false);
   UI.tab = tab;
   for (const v of ['home', 'debts', 'wishes', 'stats', 'settings']) $('#v-' + v).hidden = tab !== v;
   document.querySelectorAll('.tabs [data-tab]').forEach(b => { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -1580,6 +1817,11 @@ document.addEventListener('click', (e) => {
     case 'debt-edit': sheetDebt(t.dataset.id); break;
     case 'method': S.settings.method = t.dataset.m; persist('settings'); renderDebts(); break;
     case 'month': UI.statsMonth = addMonths(UI.statsMonth, Number(t.dataset.d)); renderStats(); break;
+    case 'native-kb': startNative(); break;
+    case 'goals': sheetGoals(); break;
+    case 'goal-new': sheetGoal(null); break;
+    case 'goal-edit': sheetGoal(t.dataset.id); break;
+    case 'kb-pref': S.settings.kb = t.dataset.v; UI.kbFail = false; persist('settings'); renderSettings(); break;
     case 'cat-icon': sheetCatIcon(t.dataset.id); break;
     case 'pick-icon': { const c = S.settings.cats.find(x => x.id === t.dataset.id); if (c) { c.icon = t.dataset.key; persist('settings'); sheetCatIcon(c.id); renderSettings(); } break; }
     case 'pick-color': { const c = S.settings.cats.find(x => x.id === t.dataset.id); if (c) { c.color = t.dataset.color; persist('settings'); sheetCatIcon(c.id); renderSettings(); } break; }
@@ -1605,12 +1847,15 @@ document.addEventListener('click', (e) => {
   }
 });
 document.addEventListener('input', (e) => {
+  if (e.target.id === 'amtIn') { onNativeInput(e.target); return; }
   if (e.target.id === 'budgetIn') { const v = parseMoney(e.target.value); if (v != null && !isNaN(v)) previewBudget(v); }
 });
 document.addEventListener('change', (e) => {
   const el = e.target, f = el.dataset && el.dataset.field, s = S.settings;
   if (el.id === 'budgetIn') { const v = parseMoney(el.value); if (v != null && !isNaN(v)) { s.debtBudget = v; persist('settings'); } renderDebts(); return; }
   if (el.id === 'leftoverToggle') { s.leftoverToDebt = el.checked; persist('settings'); renderDebts(); return; }
+  if (el.id === 'gDebtOn') { s.debtReserve = el.checked; if (el.checked) s.debtSince = todayISO(); persist('settings'); sheetGoals(); rerender(); return; }
+  if (el.id === 'gDebtBy') { s.debtGoalBy = el.value && el.value > todayISO() ? el.value : null; persist('settings'); sheetGoals(); rerender(); return; }
   if (!f) return;
   {
     const c = s.cats.find(x => x.id === el.dataset.id); if (!c) return;
@@ -1623,13 +1868,19 @@ document.addEventListener('change', (e) => {
 document.addEventListener('keydown', (e) => {
   if (UI.tab !== 'home' || !$('#sheet').hidden) return;
   const tag = (e.target.tagName || '').toLowerCase();
-  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  if ((tag === 'input' && !(e.target.id === 'amtIn' && e.target.readOnly)) || tag === 'textarea' || tag === 'select') return;
   if (/^[0-9]$/.test(e.key)) { key(e.key); e.preventDefault(); }
   else if (e.key === ',' || e.key === '.') { key(','); e.preventDefault(); }
   else if (e.key === 'Backspace') { key('back'); e.preventDefault(); }
   else if (e.key === 'Enter' && amtCents() > 0) { addExpense(); e.preventDefault(); }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'amtIn' && !e.target.readOnly) { e.preventDefault(); if (amtCents() > 0) addExpense(); else endNative(false); } });
+// Keep focus in the amount field while tapping tiles / toggle / Add, so the device keyboard stays up.
+document.addEventListener('mousedown', (e) => { if (nativeOn() && e.target.closest('.tile, #homeToggle, #addBtn2')) e.preventDefault(); });
+document.addEventListener('focusout', (e) => { if (e.target.id === 'amtIn') setTimeout(() => { const i = $('#amtIn'); if (!i.readOnly && document.activeElement !== i) endNative(false); }, 120); });
+// Keyboard dismissed (e.g. Android back) without a blur: return to the in-app keypad.
+if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (nativeOn() && UI.kbOK && viewH() > UI.kbH0 - 60) endNative(false); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'budgetIn') e.target.blur(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) rerender(); });
 
@@ -1642,7 +1893,7 @@ showTab(HASH_TABS[location.hash] || 'home');
 window.addEventListener('hashchange', () => { if (HASH_TABS[location.hash]) showTab(HASH_TABS[location.hash]); });
 connect().then(() => { resetEntry(); rerender(); });
 
-window.__budget = { simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
+window.__budget = { reserveFor, startNative, endNative, homeState, simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
 })();
 </script>
 </body>
