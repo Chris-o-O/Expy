@@ -158,7 +158,16 @@ body.kb .amount .cur { font-size: 7cqw; }
 .sheet .row .d { white-space: normal; }
 .form label.chk { flex-direction: row; align-items: center; font-size: 14px; color: var(--fg); font-weight: 600; }
 body:not(.appkeys) .keypad { display: none; }
+.nat-add { height: 60px; display: flex; justify-content: center; align-items: center; }
 body.appkeys .nat-add { display: none; }
+.fab { width: 60px; height: 60px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-fg); display: flex; align-items: center; justify-content: center; transform: scale(.4); opacity: 0; pointer-events: none; transition: transform .3s cubic-bezier(.3,1.6,.5,1), opacity .18s; box-shadow: 0 6px 16px rgba(0,0,0,.18); }
+.fab:not(:disabled) { transform: scale(1); opacity: 1; pointer-events: auto; }
+.fab svg, .keypad .add svg { width: 30px; height: 30px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.fab svg path, .keypad .add svg path { stroke-dasharray: 24; stroke-dashoffset: 0; }
+.fab.done, .keypad .add.done { animation: fabpop .36s ease; }
+.fab.done svg path, .keypad .add.done svg path { animation: fabcheck .26s ease; }
+@keyframes fabpop { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes fabcheck { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
 body.kb .keypad, body.kb .tabs, body.kb #banners, body.kb .stats3, body.kb .legend, body.kb .homehead, body.kb #recentHead, body.kb #recent { display: none; }
 body.kb .wrap { padding-bottom: 16px; }
 .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-block: 2px; margin-inline: -16px; padding-inline: 16px; }
@@ -387,10 +396,10 @@ body.kb .wrap { padding-bottom: 16px; }
       <div class="keypad" id="keypad">
         <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button class="fn" data-k="back" aria-label="Effacer un chiffre">⌫</button>
         <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button class="fn" data-k="," aria-label="Virgule décimale">,</button>
-        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button class="add" id="addBtn" data-act="add" disabled>Ajouter</button>
+        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button class="add" id="addBtn" data-act="add" aria-label="Ajouter la dépense" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
         <button class="zero" data-k="0">0</button>
       </div>
-      <button class="btn block nat-add" id="addBtn2" data-act="add" disabled>Ajouter</button>
+      <div class="nat-add" id="natAdd"><button class="fab" id="addBtn2" data-act="add" aria-label="Ajouter la dépense" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>
     </div>
     <div id="recentHead" style="display:flex;justify-content:space-between;align-items:baseline;padding-top:6px"><h2>Dernières dépenses</h2><button class="link" data-act="tab" data-tab="stats">Tout le mois</button></div>
     <div id="recent"></div>
@@ -934,6 +943,11 @@ function resetEntry(keepKb) {
   UI.optsOpen = false; $('#opts').hidden = true; $('#optsBtn').setAttribute('aria-expanded', 'false');
   { const ls = S.settings.lastSplit; UI.split = { on: false, pid: ls ? ls.pid : null, pct: ls ? ls.pct : 50, by: ls ? ls.by : 'me' }; }
   renderAmount(); renderChips(); renderHomeToggle(); renderSplit();
+}
+function pressAdd(btn) {
+  if (UI.adding || amtCents() <= 0) return;
+  UI.adding = true; btn.classList.add('done');
+  setTimeout(() => { btn.classList.remove('done'); UI.adding = false; addExpense(); }, 240);
 }
 function addExpense() {
   const total = amtCents();
@@ -1568,7 +1582,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.8</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.8.1</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -2001,7 +2015,7 @@ document.addEventListener('click', (e) => {
   if (!t) return;
   const a = t.dataset.act;
   switch (a) {
-    case 'add': addExpense(); break;
+    case 'add': pressAdd(t); break;
     case 'pick-cat': UI.cat = t.dataset.cat; UI.catPicked = true; if (!UI.homePicked) UI.home = !!catById(UI.cat).home; renderChips(); renderHomeToggle(); break;
     case 'toggle-home': UI.home = !UI.home; UI.homePicked = true; renderHomeToggle(); break;
     case 'toggle-opts': UI.optsOpen = !UI.optsOpen; $('#opts').hidden = !UI.optsOpen; t.setAttribute('aria-expanded', String(UI.optsOpen)); break;
