@@ -118,14 +118,28 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .homehead .per { font-size: 13px; font-weight: 700; color: var(--muted); border: 0; background: transparent; padding: 0; }
 .daypill { font-size: 12px; font-weight: 800; background: var(--fg); color: var(--bg); padding: 5px 11px; border-radius: 999px; }
 :root { --c-debt: #8B3DFF; --c-save: #12A150; }
-.dial { --d: min(222px, 26vh); --d: min(222px, 26dvh); position: relative; width: var(--d); height: var(--d); margin: 0 auto; container-type: inline-size; flex: none; }
-.dial svg { width: 100%; height: 100%; display: block; }
-.dial-c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1cqw; padding-inline: 13cqw; }
+.dial { --ring: min(222px, 26vh); --ring: min(222px, 26dvh); position: relative; width: var(--ring); height: var(--ring); margin: 0 auto; container-type: inline-size; flex: none; max-width: 100%; transition: width .38s cubic-bezier(.3,.7,.2,1), height .38s cubic-bezier(.3,.7,.2,1); }
+.dial svg { position: absolute; left: 50%; top: 0; width: var(--ring); height: var(--ring); margin-left: calc(var(--ring) / -2); display: block; transition: opacity .22s, transform .38s cubic-bezier(.3,.7,.2,1); transform-origin: 50% 100%; }
+/* Keyboard open: the ring flattens into a bar, the amount grows */
+.hbar { position: absolute; left: 0; right: 0; bottom: 2px; height: 14px; border-radius: 999px; background: var(--surface-2); overflow: hidden; opacity: 0; transform: scaleX(.3); transition: opacity .25s .1s, transform .38s cubic-bezier(.3,.7,.2,1); pointer-events: none; }
+.hbar i { position: absolute; top: 0; bottom: 0; transition: left .3s ease, width .3s ease, background-color .2s; }
+.hbar b { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: var(--accent); transition: left .3s ease; }
+body.kb .dial { width: 100%; height: 132px; }
+body.kb .dial svg { opacity: 0; transform: scale(.35) translateY(-20%); pointer-events: none; }
+body.kb .hbar { opacity: 1; transform: none; }
+body.kb .dial-c { inset: 0 0 24px 0; padding-inline: 0; }
+body.kb .amount .big { font-size: 17cqw; }
+body.kb .amount[data-l="l"] .big { font-size: 14cqw; }
+body.kb .amount[data-l="xl"] .big { font-size: 11cqw; }
+body.kb .dial-k { font-size: 3.6cqw; }
+body.kb .dial-n { font-size: 4.2cqw; }
+body.kb .amount .cur { font-size: 7cqw; }
+.dial-c { transition: inset .38s cubic-bezier(.3,.7,.2,1), padding .38s; position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1cqw; padding-inline: 13cqw; }
 .dial-k { font-size: 4.6cqw; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 1.5cqw; }
 .dial-k svg { width: 5.6cqw; height: 5.6cqw; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .amount { display: flex; align-items: baseline; justify-content: center; gap: 1.5cqw; min-width: 0; max-width: 100%; }
 .amount.can-kb { cursor: text; }
-.amount .big { font-size: 21.7cqw; font-weight: 800; letter-spacing: -.05em; line-height: 1.1; border: 0; background: transparent; padding: 0; margin: 0; text-align: center; color: var(--fg); outline: none; caret-color: var(--accent); min-width: 1ch; max-width: 100%; width: auto; border-radius: 0; field-sizing: content; }
+.amount .big { transition: font-size .38s cubic-bezier(.3,.7,.2,1); font-size: 21.7cqw; font-weight: 800; letter-spacing: -.05em; line-height: 1.1; border: 0; background: transparent; padding: 0; margin: 0; text-align: center; color: var(--fg); outline: none; caret-color: var(--accent); min-width: 1ch; max-width: 100%; width: auto; border-radius: 0; field-sizing: content; }
 .amount .big::placeholder { color: var(--muted); opacity: .5; }
 .amount[data-l="l"] .big { font-size: 16cqw; }
 .amount[data-l="xl"] .big { font-size: 12.5cqw; }
@@ -146,7 +160,6 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 body:not(.appkeys) .keypad { display: none; }
 body.appkeys .nat-add { display: none; }
 body.kb .keypad, body.kb .tabs, body.kb #banners, body.kb .stats3, body.kb .legend, body.kb .homehead, body.kb #recentHead, body.kb #recent { display: none; }
-body.kb .dial { --d: min(150px, 24vh); --d: min(150px, 24dvh); }
 body.kb .wrap { padding-bottom: 16px; }
 .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-block: 2px; margin-inline: -16px; padding-inline: 16px; }
 .chips::-webkit-scrollbar { display: none; }
@@ -335,6 +348,7 @@ body.kb .wrap { padding-bottom: 16px; }
         <div class="amount" id="amount"><input class="big num" id="amtIn" type="text" inputmode="none" readonly autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="0" aria-label="Montant de la dépense"><span class="cur">$</span></div>
         <div class="dial-n" id="dialN" aria-live="polite"></div>
       </div>
+      <div class="hbar" id="hbar" aria-hidden="true"><i id="hb-sp"></i><i id="hb-gh"></i><i id="hb-de"></i><i id="hb-sa"></i><b id="hb-pc"></b></div>
     </div>
     <button class="legend" id="legend" data-act="goals" hidden></button>
     <div class="stats3" id="stats3"></div>
@@ -946,6 +960,14 @@ function renderRing() {
     note = `<span class="muted">${esc(h.label)} : ${money0(h.spent)}</span>`; label = 'Aucune période définie';
   }
   $('#ring').innerHTML = svg; $('#ring').setAttribute('aria-label', label);
+  const seg = (id, a, l, c) => { const el = $('#' + id); el.style.left = (a * 100).toFixed(2) + '%'; el.style.width = (Math.max(0, l) * 100).toFixed(2) + '%'; if (c) el.style.background = c; };
+  if (h.per) {
+    const A = h.amount, rs = h.rs, fs = Math.min(rs.save / A, 1), fd = Math.min(rs.debt / A, 1 - fs), sp = Math.min(h.spent / A, 1);
+    seg('hb-sp', 0, sp, h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)');
+    seg('hb-gh', sp, e > 0 ? Math.min(e / A, 1 - sp) : 0, catById(UI.cat).color);
+    seg('hb-de', 1 - fs - fd, fd, 'var(--c-debt)'); seg('hb-sa', 1 - fs, fs, 'var(--c-save)');
+    $('#hb-pc').style.left = (h.free > 0 ? Math.min(100, (h.free * (h.elapsed - 0.5) / h.len) / A * 100) : -5) + '%';
+  } else for (const id of ['hb-sp', 'hb-gh', 'hb-de', 'hb-sa']) seg(id, 0, 0);
   $('#dialN').innerHTML = note;
 }
 // The latest finished period whose debts have not been updated yet (shown the day after it ends).
@@ -1388,7 +1410,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.6.1</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.6.2</p>`;
 }
 
 /* ---------- Sheets ---------- */
