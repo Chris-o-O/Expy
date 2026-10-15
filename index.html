@@ -122,10 +122,11 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .chip .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .chip[aria-pressed="true"] { border-color: var(--fg); background: var(--fg); color: var(--bg); }
 /* Category tiles with icons: two rows, scroll sideways */
-.tiles { display: grid; grid-template-rows: repeat(2, 60px); grid-auto-flow: column; grid-auto-columns: calc((100% - 16px) / 3.4); gap: 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; }
+.tiles { display: grid; grid-template-rows: repeat(2, 56px); grid-auto-flow: column; grid-auto-columns: calc((100% - 32px) / 5); gap: 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; }
 .tiles::-webkit-scrollbar { display: none; }
-.tile { scroll-snap-align: start; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; border: 0; border-radius: 18px; background: var(--surface); padding: 9px 10px; font-size: 12.5px; font-weight: 700; text-align: left; min-width: 0; }
-.tile .tn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile { scroll-snap-align: start; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 18px; background: var(--surface); padding: 0; min-width: 0; }
+.tile .ico { width: 34px; height: 34px; }
+.tile .ico svg { width: 20px; height: 20px; }
 .tile[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
 .ico { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; flex: none; }
 .ico svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -287,7 +288,7 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .sheet .chips { flex-wrap: wrap; overflow: visible; margin-inline: 0; padding-inline: 0; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-@media (max-height: 760px) { .keypad { grid-auto-rows: 44px; } .amount .big { font-size: 42px; } .amount { min-height: 46px; } .tiles { grid-template-rows: repeat(2, 54px); } .tile { padding: 7px 10px; } }
+@media (max-height: 760px) { .keypad { grid-auto-rows: 44px; } .amount .big { font-size: 42px; } .amount { min-height: 46px; } .tiles { grid-template-rows: repeat(2, 50px); } }
 </style>
 </head>
 <body>
@@ -713,7 +714,7 @@ function renderChips() {
   if (!UI.cat || !S.settings.cats.some(c => c.id === UI.cat)) UI.cat = suggestCat(0);
   const keepX = $('#chips').scrollLeft;
   $('#chips').innerHTML = cats.map(c =>
-    `<button class="tile" data-act="pick-cat" data-cat="${esc(c.id)}" aria-pressed="${c.id === UI.cat}"><span class="ico" style="background:${esc(c.color)}">${catIconSvg(c)}</span><span class="tn">${esc(c.name)}</span></button>`).join('');
+    `<button class="tile" data-act="pick-cat" data-cat="${esc(c.id)}" aria-label="${esc(c.name)}" title="${esc(c.name)}" aria-pressed="${c.id === UI.cat}"><span class="ico" style="background:${esc(c.color)}">${catIconSvg(c)}</span></button>`).join('');
   // keep the sideways scroll position, and bring the selected tile into view without moving the page
   const box = $('#chips'); box.scrollLeft = keepX;
   const on = box.querySelector('[aria-pressed="true"]');
@@ -1222,7 +1223,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.5</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.5.1</p>`;
 }
 
 /* ---------- Sheets ---------- */
