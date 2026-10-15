@@ -1,7 +1,7 @@
 // Offline cache for Expy. Bump VERSION whenever a file changes: phones then install the new
 // version in the background, and the app offers a one-tap "Mettre à jour".
-const VERSION = 'expy-v1.3.0';
-const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'fonts/archivo.woff2', 'fonts/plex-mono-400.woff2', 'fonts/plex-mono-500.woff2', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'];
+const VERSION = 'expy-v1.4.0';
+const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'fonts/bricolage.woff2', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'];
 
 self.addEventListener('install', (e) => {
   // Fetch fresh copies (bypass the HTTP cache). No skipWaiting here: the new version waits for the user's tap.
