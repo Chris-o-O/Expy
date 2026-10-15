@@ -119,13 +119,13 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .daypill { font-size: 12px; font-weight: 800; background: var(--fg); color: var(--bg); padding: 5px 11px; border-radius: 999px; }
 :root { --c-debt: #8B3DFF; --c-save: #12A150; }
 .dial { --ring: min(222px, 26vh); --ring: min(222px, 26dvh); position: relative; width: var(--ring); height: var(--ring); margin: 0 auto; container-type: inline-size; flex: none; max-width: 100%; transition: width .38s cubic-bezier(.3,.7,.2,1), height .38s cubic-bezier(.3,.7,.2,1); }
-.dial svg { position: absolute; left: 50%; top: 0; width: var(--ring); height: var(--ring); margin-left: calc(var(--ring) / -2); display: block; transition: opacity .22s, transform .38s cubic-bezier(.3,.7,.2,1); transform-origin: 50% 100%; }
+.dial > svg { position: absolute; left: 50%; top: 0; width: var(--ring); height: var(--ring); margin-left: calc(var(--ring) / -2); display: block; transition: opacity .22s, transform .38s cubic-bezier(.3,.7,.2,1); transform-origin: 50% 100%; }
 /* Keyboard open: the ring flattens into a bar, the amount grows */
 .hbar { position: absolute; left: 0; right: 0; bottom: 2px; height: 14px; border-radius: 999px; background: var(--surface-2); overflow: hidden; opacity: 0; transform: scaleX(.3); transition: opacity .25s .1s, transform .38s cubic-bezier(.3,.7,.2,1); pointer-events: none; }
 .hbar i { position: absolute; top: 0; bottom: 0; transition: left .3s ease, width .3s ease, background-color .2s; }
 .hbar b { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: var(--accent); transition: left .3s ease; }
 body.kb .dial { width: 100%; height: 132px; }
-body.kb .dial svg { opacity: 0; transform: scale(.35) translateY(-20%); pointer-events: none; }
+body.kb .dial > svg { opacity: 0; transform: scale(.35) translateY(-20%); pointer-events: none; }
 body.kb .hbar { opacity: 1; transform: none; }
 body.kb .dial-c { inset: 0 0 24px 0; padding-inline: 0; }
 body.kb .amount .big { font-size: 17cqw; }
@@ -954,7 +954,7 @@ function renderRing() {
     if (e > 0) {
       const after = h.left - e;
       note = after >= 0 ? `<span style="color:${h.free > 0 && h.spent + e >= .8 * h.free ? 'var(--warn)' : 'var(--ok)'}">→ reste ${money(after)}</span>` : `<span style="color:var(--bad)">→ dépasse de ${money(-after)}</span>`;
-    } else note = `<span class="muted">sur ${money0(h.free)} libres</span>`;
+    } else note = `<span class="muted">reste ${money(h.left)}</span>`;
     label = `${Math.round(h.spent / A * 100)} % du seuil dépensé${rs.total ? ', ' + Math.round(rs.total / A * 100) + ' % réservé' : ''}`;
   } else {
     note = `<span class="muted">${esc(h.label)} : ${money0(h.spent)}</span>`; label = 'Aucune période définie';
@@ -1410,7 +1410,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.6.2</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.6.3</p>`;
 }
 
 /* ---------- Sheets ---------- */
