@@ -224,6 +224,16 @@ body.kb .wrap { padding-bottom: 16px; }
 .meter { height: 8px; border-radius: 999px; background: rgba(10,10,10,.14); overflow: hidden; margin-top: 8px; }
 .meter > i { display: block; height: 100%; border-radius: 999px; background: #0A0A0A; }
 
+/* Dashboard + goals */
+.dline { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; margin-top: 8px; font-size: 13.5px; font-weight: 700; width: 100%; }
+.dline .d { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--muted); }
+.dline .meter { grid-column: 1 / -1; height: 5px; margin-top: 3px; }
+.big3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.big3 > div { display: flex; flex-direction: column; min-width: 0; }
+.big3 .k { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--hero-sub); font-weight: 700; }
+.big3 .v { font-size: 30px; font-weight: 800; letter-spacing: -.04em; line-height: 1.1; }
+.big3 .v small { font-size: 15px; font-weight: 700; }
+
 /* Banners */
 .banner { border-radius: 20px; padding: 12px 14px; font-size: 13.5px; display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1.5px solid var(--line); background: var(--surface); }
 .banner.ex { border-style: dashed; }
@@ -311,9 +321,9 @@ body.kb .wrap { padding-bottom: 16px; }
 
 /* Tab bar: floating pill */
 .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; pointer-events: none; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
-.tabs-in { pointer-events: auto; width: max-content; margin: 0 auto; display: flex; gap: 4px; padding: 6px; border-radius: 999px; background: var(--pill-bg); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
-.tabs button { position: relative; border: 0; background: transparent; width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--pill-fg); }
-.tabs button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.tabs-in { pointer-events: auto; width: max-content; max-width: calc(100% - 12px); margin: 0 auto; display: flex; gap: 2px; padding: 5px; border-radius: 999px; background: var(--pill-bg); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+.tabs button { position: relative; border: 0; background: transparent; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--pill-fg); }
+.tabs button svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .tabs button[aria-current="page"] { background: var(--accent); color: var(--accent-fg); }
 :root[data-theme="dark"] .tabs button[aria-current="page"] { color: #0A0A0A; }
 
@@ -373,6 +383,8 @@ body.kb .wrap { padding-bottom: 16px; }
     <div id="recentHead" style="display:flex;justify-content:space-between;align-items:baseline;padding-top:6px"><h2>Dernières dépenses</h2><button class="link" data-act="tab" data-tab="stats">Tout le mois</button></div>
     <div id="recent"></div>
   </section>
+  <section id="v-dash" class="view" hidden></section>
+  <section id="v-goals" class="view" hidden></section>
   <section id="v-debts" class="view" hidden></section>
   <section id="v-wishes" class="view" hidden></section>
   <section id="v-stats" class="view" hidden></section>
@@ -381,8 +393,10 @@ body.kb .wrap { padding-bottom: 16px; }
 
 <nav class="tabs" aria-label="Sections">
   <div class="tabs-in">
+    <button data-act="tab" data-tab="dash" aria-label="Tableau de bord"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg><span class="sr">Tableau de bord</span></button>
     <button data-act="tab" data-tab="home" aria-label="Saisie" aria-current="page"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="sr">Saisie</span></button>
     <button data-act="tab" data-tab="debts" aria-label="Dettes"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/></svg><span class="sr">Dettes</span></button>
+    <button data-act="tab" data-tab="goals" aria-label="Objectifs"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6"/></svg><span class="sr">Objectifs</span></button>
     <button data-act="tab" data-tab="wishes" aria-label="Souhaits"><svg viewBox="0 0 24 24"><path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/></svg><span class="sr">Souhaits</span></button>
     <button data-act="tab" data-tab="stats" aria-label="Stats"><svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-6"/></svg><span class="sr">Stats</span></button>
     <button data-act="tab" data-tab="settings" aria-label="Réglages"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span class="sr">Réglages</span></button>
@@ -1017,6 +1031,96 @@ function renderRecent() {
 }
 function renderHome() { renderSummary(); renderBanners(); renderRecent(); renderChips(); }
 
+/* ---------- Dashboard ---------- */
+function dashData() {
+  const s = S.settings, today = todayISO(), out = {};
+  if (s.debts.length) {
+    let paidAll = 0, totAll = 0;
+    const rows = s.debts.map(d => {
+      const paid = s.payments.filter(p => p.debtId === d.id).reduce((a, p) => a + p.amt, 0), bal = Math.max(0, d.bal), tot = paid + bal;
+      paidAll += paid; totAll += tot;
+      return { n: d.name, p: tot > 0 ? Math.round(paid / tot * 100) : 100, d: bal > 0 ? `${money0(bal)} restants` : 'Soldée' };
+    });
+    const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
+    out.debts = { p: totAll > 0 ? Math.round(paidAll / totAll * 100) : 100, rows, sub: bal > 0 ? `${money0(bal)} restants · libre en ${payoffLabel(debtSim().months)}` : 'Toutes les dettes sont soldées' };
+  }
+  if (s.goals.length) {
+    const sv = s.goals.reduce((a, g) => a + Math.min(g.saved, g.target), 0), tg = s.goals.reduce((a, g) => a + g.target, 0);
+    out.goals = { p: Math.round(sv / tg * 100), sub: `${money0(sv)} sur ${money0(tg)}`,
+      rows: s.goals.map(g => ({ n: g.name, p: Math.min(100, Math.round(g.saved / g.target * 100)), d: `${money0(g.saved)} sur ${money0(g.target)} · d'ici le ${shortDate(g.by, true)}` })) };
+  }
+  if (s.wishes.length) {
+    const plan = wishPlan(); let cum = 0, wsum = 0, wtot = 0;
+    const rows = plan.rows.map(({ w, when, state }) => {
+      const cov = Math.max(0, Math.min(1, ((s.wishCushion || 0) - cum) / w.price)); cum += w.price;
+      let t = 0;
+      if (state === 'now') t = 1;
+      else if (state === 'date' && w.added && when > w.added) t = Math.max(0, Math.min(1, daysBetween(w.added, today) / daysBetween(w.added, when)));
+      const p = Math.round(Math.max(cov, t) * 100); wsum += p * w.price; wtot += w.price;
+      return { n: w.name, p, d: state === 'now' ? 'Possible maintenant' : state === 'date' ? `Vers le ${shortDate(when, true)}` : state === 'never' ? 'Pas atteignable au rythme actuel' : 'Date à estimer' };
+    });
+    out.wishes = { p: wtot ? Math.round(wsum / wtot) : 0, rows, sub: `${s.wishes.length} souhait${s.wishes.length > 1 ? 's' : ''} · ${money0(wtot)}` };
+  }
+  return out;
+}
+function renderDash() {
+  const s = S.settings, dd = dashData(), per = activePeriod();
+  const card = (tab, title, o) => `<li><button class="debt" data-act="tab" data-tab="${tab}">
+    <span class="l1"><span class="name">${title}</span><span class="bal num">${o.p} %</span></span>
+    <span class="l2"><span>${esc(o.sub)}</span></span>
+    <span class="meter" aria-hidden="true"><i style="width:${Math.max(3, o.p)}%"></i></span>
+    ${o.rows.slice(0, 4).map(it => `<span class="dline"><span>${esc(it.n)}</span><span class="num">${it.p} %</span><span class="d">${esc(it.d)}</span><span class="meter" aria-hidden="true"><i style="width:${Math.max(3, it.p)}%"></i></span></span>`).join('')}
+    ${o.rows.length > 4 ? `<span class="l2"><span>+ ${o.rows.length - 4} autre${o.rows.length - 4 > 1 ? 's' : ''}</span></span>` : ''}
+  </button></li>`;
+  const kinds = [['debts', 'Dettes remboursées', 'Dettes'], ['goals', 'Objectifs', 'Objectifs'], ['wishes', 'Souhaits', 'Souhaits']].filter(k => dd[k[0]]);
+  let body = `<div class="view-head"><h1>Tableau de bord</h1></div>`;
+  if (!kinds.length) {
+    $('#v-dash').innerHTML = body + `<div class="empty">Ajoute une dette, un objectif ou un souhait pour suivre ici leur progression.</div>
+      <div class="btn-row" style="justify-content:center"><button class="btn ghost" data-act="tab" data-tab="debts">Dettes</button><button class="btn ghost" data-act="tab" data-tab="goals">Objectifs</button><button class="btn ghost" data-act="tab" data-tab="wishes">Souhaits</button></div>`;
+    return;
+  }
+  const h = per ? homeState() : null;
+  body += `<div class="card hero"><div class="big3">${kinds.map(k => `<div><span class="k">${k[2]}</span><span class="v num">${dd[k[0]].p}<small> %</small></span></div>`).join('')}</div>
+    ${h && h.per ? `<div class="note">Période en cours : ${money0(h.left)} libres sur ${money0(h.amount)}${h.rs.total ? ` (${money0(h.rs.total)} réservés)` : ''} · jour ${h.elapsed} / ${h.len}.</div>` : ''}</div>`;
+  body += `<ul class="list stack">${kinds.map(k => card(k[0] === 'debts' ? 'debts' : k[0], k[1], dd[k[0]])).join('')}</ul>
+    <p class="note">Dettes : part déjà remboursée d'après les paiements enregistrés. Souhaits : avancement vers la date estimée d'achat.</p>`;
+  $('#v-dash').innerHTML = body;
+}
+
+/* ---------- Goals view ---------- */
+function renderGoals() {
+  const s = S.settings, per = activePeriod(), rs = per ? reserveFor(per) : null;
+  const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
+  let dnote = '';
+  if (bal > 0) {
+    if (s.debtGoalBy) dnote = `Pour être libre d'ici le ${shortDate(s.debtGoalBy, true)}, il faut environ ${money0(bal / Math.max(1, (daysBetween(todayISO(), s.debtGoalBy) + 1) / DAYS_MO))} par mois (sans les intérêts).`;
+    else if (s.debtBudget > 0) dnote = `Sans date, la réserve suit ton budget de remboursement : ${money0(s.debtBudget)} par mois.`;
+    else dnote = `Sans date et sans budget de remboursement, rien n'est réservé. Indique l'un des deux.`;
+  }
+  let body = `<div class="view-head"><h1>Objectifs</h1><button class="btn" data-act="goal-new">Ajouter</button></div>`;
+  body += `<div class="card hero">${rs ? `<div class="kv">
+      <div><span class="k">Seuil</span><span class="v num">${money0(per.amount)}</span></div>
+      <div><span class="k">Réservé</span><span class="v num">${money0(rs.total)}</span></div>
+      <div><span class="k">Libre</span><span class="v num">${money0(per.amount - rs.total)}</span></div></div>
+      <div class="note">Période de ${periodLen(per)} jours. Chaque objectif prend une part du seuil proportionnelle à la durée de la période, retirée de ce que tu peux dépenser.</div>`
+    : `<div class="note">Définis une période et un seuil pour voir la part réservée à chaque objectif.</div>`}</div>`;
+  body += `<div class="card"><h2>Dettes</h2>
+    ${bal > 0 ? `<label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="gDebtOn" ${s.debtReserve ? 'checked' : ''}>Réserver pour rembourser mes dettes (${money0(bal)})</label>
+    <label class="form" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:700;color:var(--muted)">Libre de dettes d'ici (facultatif)<input class="field" id="gDebtBy" type="date" value="${esc(s.debtGoalBy || '')}"></label>
+    <div class="note">${esc(dnote)}</div>` : `<div class="note">Aucune dette suivie. Ajoute-en une dans l'onglet Dettes.</div>`}</div>`;
+  if (!s.goals.length) body += `<div class="empty">Aucun objectif d'épargne. Exemple : 1 200 $ d'ici la fin de l'année. Expy en réserve une part à chaque période.</div>`;
+  else body += `<ul class="list stack">${s.goals.map(g => {
+    const a = rs ? (rs.goals.find(x => x.id === g.id) || { amt: 0 }).amt : 0, p = Math.min(100, Math.round(g.saved / g.target * 100));
+    const over = g.by < todayISO() && g.target > g.saved;
+    return `<li><button class="debt" data-act="goal-edit" data-id="${esc(g.id)}">
+      <span class="l1"><span class="name">${esc(g.name)}${g.ex ? '<span class="tag ex">ex.</span>' : ''}</span><span class="bal num">${p} %</span></span>
+      <span class="l2"><span class="mono">${money0(g.saved)} sur ${money0(g.target)}</span><span>${over ? 'Échéance passée' : 'd\'ici le ' + esc(shortDate(g.by, true))}</span></span>
+      <span class="meter" aria-hidden="true"><i style="width:${Math.max(3, p)}%"></i></span>
+      ${rs && a ? `<span class="l2"><span>${money0(a)} réservés cette période</span></span>` : ''}</button></li>`;
+  }).join('')}</ul>`;
+  $('#v-goals').innerHTML = body;
+}
+
 /* ---------- Debts view ---------- */
 function renderDebts() {
   const s = S.settings;
@@ -1048,7 +1152,7 @@ function renderDebts() {
     </div>
     <div class="note" id="budgetNote">${budgetNoteText(s.debtBudget, sumMin)}</div>
     <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="leftoverToggle" ${s.leftoverToDebt ? 'checked' : ''}>Ajouter le reste de chaque période sous le seuil</label>
-    <button class="link" data-act="goals" style="text-align:left;padding:0">${s.debtReserve ? 'Une part de chaque période est réservée aux dettes' : 'Réserver une part de chaque période'} · Objectifs ›</button>
+    <button class="link" data-act="goals" style="text-align:left;padding:0">${s.debtReserve ? 'Une part de chaque période est réservée aux dettes' : 'Réserver une part de chaque période'} · Onglet Objectifs ›</button>
     ${sim.short ? `<div class="warntext">Le budget est sous la somme des minimums (${money(sumMin)}).</div>` : ''}
     ${sim.never && !sim.short ? `<div class="warntext">À ce budget, au moins une dette ne sera jamais remboursée.</div>` : ''}
     <div class="seg" role="group" aria-label="Méthode">
@@ -1350,13 +1454,6 @@ function sheetWishSettings() {
 }
 
 /* ---------- Settings view ---------- */
-function goalsSummary() {
-  const p = activePeriod();
-  if (!p) return 'Réserve automatiquement une part du seuil de chaque période pour tes dettes et ton épargne.';
-  const rs = reserveFor(p);
-  if (!rs.total) return 'Réserve automatiquement une part du seuil de chaque période pour tes dettes et ton épargne.';
-  return `Cette période : ${money0(rs.total)} réservés sur ${money0(p.amount)} (dettes ${money0(rs.debt)}, épargne ${money0(rs.save)}).`;
-}
 function renderSettings() {
   const s = S.settings;
   const periods = s.periods.slice().sort((a, b) => b.start.localeCompare(a.start));
@@ -1384,8 +1481,6 @@ function renderSettings() {
       ${thRows}${periods.length > 12 ? `<div class="note">${periods.length - 12} périodes plus anciennes.</div>` : ''}</div>
     <div class="card"><h2>Catégories</h2><div class="note">Touche l'icône pour changer l'icône et la couleur. Seuil facultatif par catégorie. « Faisable maison » coche la bascule par défaut à la saisie.</div><div>${catRows}</div>
       <div style="display:grid;grid-template-columns:1fr auto;gap:8px"><input class="field" id="newCat" maxlength="24" placeholder="Nouvelle catégorie"><button class="btn ghost" data-act="cat-add">Ajouter</button></div></div>
-    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Objectifs</h2><button class="btn ghost" data-act="goals">Gérer</button></div>
-      <div class="note">${goalsSummary()}</div></div>
     <div class="card"><h2>Apparence</h2>
       <div class="seg three" role="group" aria-label="Thème">
         ${[['auto', 'Auto'], ['light', 'Clair'], ['dark', 'Sombre']].map(([v, l]) => `<button data-act="theme" data-t="${v}" aria-pressed="${s.theme === v}">${l}</button>`).join('')}
@@ -1410,7 +1505,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.6.3</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.7</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -1419,38 +1514,6 @@ function closeSheet() { $('#sheet').hidden = true; $('#sheetPanel').innerHTML = 
 
 // Edit a budget period, or create one (id null). Defaults for a new one: the day after the latest period,
 // for the same length and amount; with no period yet, the current calendar month.
-function sheetGoals() {
-  const s = S.settings, per = activePeriod();
-  const rs = per ? reserveFor(per) : null;
-  const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
-  let dnote = '';
-  if (bal > 0) {
-    if (s.debtGoalBy) dnote = `Pour être libre d'ici le ${shortDate(s.debtGoalBy, true)}, il faut environ ${money0(bal / Math.max(1, (daysBetween(todayISO(), s.debtGoalBy) + 1) / DAYS_MO))} par mois (sans les intérêts).`;
-    else if (s.debtBudget > 0) dnote = `Sans date, la réserve suit ton budget de remboursement : ${money0(s.debtBudget)} par mois.`;
-    else dnote = `Sans date et sans budget de remboursement, rien n'est réservé. Indique l'un des deux.`;
-  }
-  const rows = s.goals.map(g => {
-    const a = rs ? (rs.goals.find(x => x.id === g.id) || { amt: 0 }).amt : 0;
-    const over = g.by < todayISO() && g.target > g.saved;
-    return `<li><button class="row" data-act="goal-edit" data-id="${esc(g.id)}" style="padding-inline:0"><span class="main"><span class="t">${esc(g.name)}${g.ex ? ' <span class="tag ex">ex.</span>' : ''}</span><span class="d">${money0(g.saved)} sur ${money0(g.target)} · ${over ? 'échéance passée' : 'd\'ici le ' + esc(shortDate(g.by, true))}${rs && a ? ' · ' + money0(a) + ' cette période' : ''}</span></span><span class="muted">›</span></button></li>`;
-  }).join('');
-  openSheet(`<h1>Objectifs et réserve</h1>
-    <div class="note">Chaque période, une part du seuil est mise de côté, en proportion de sa durée. Elle est retirée de ce que tu peux dépenser et apparaît dans le cadran.</div>
-    ${rs ? `<div class="card"><div class="kv">
-      <div><span class="k">Seuil</span><span class="v num">${money0(per.amount)}</span></div>
-      <div><span class="k">Réservé</span><span class="v num">${money0(rs.total)}</span></div>
-      <div><span class="k">Libre</span><span class="v num">${money0(per.amount - rs.total)}</span></div>
-    </div><div class="note">Période de ${periodLen(per)} jours.</div></div>` : ''}
-    <div class="card"><h2>Dettes</h2>
-      ${bal > 0 ? `<label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="gDebtOn" ${s.debtReserve ? 'checked' : ''}>Réserver pour rembourser mes dettes (${money0(bal)})</label>
-      <label class="form" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:700;color:var(--muted)">Libre de dettes d'ici (facultatif)<input class="field" id="gDebtBy" type="date" value="${esc(s.debtGoalBy || '')}"></label>
-      <div class="note">${esc(dnote)}</div>` : '<div class="note">Aucune dette suivie. Ajoute-en une dans l\'onglet Dettes.</div>'}
-    </div>
-    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Épargne</h2><button class="btn ghost" data-act="goal-new">Ajouter</button></div>
-      ${rows ? `<ul class="list" style="box-shadow:none;background:transparent">${rows}</ul>` : '<div class="note">Aucun objectif. Exemple : 1 200 $ d\'ici la fin de l\'année.</div>'}
-    </div>
-    <button class="btn block" data-act="close-sheet">Fermer</button>`);
-}
 function sheetGoal(id) {
   const s = S.settings, g = id ? s.goals.find(x => x.id === id) : null;
   const yEnd = new Date().getFullYear() + '-12-31';
@@ -1464,7 +1527,7 @@ function sheetGoal(id) {
       <button class="btn block" type="submit">${g ? 'Enregistrer' : 'Ajouter'}</button>
     </form>
     ${g ? '<button class="btn danger block" id="gDel" type="button">Supprimer l\'objectif</button>' : ''}
-    <button class="btn ghost block" type="button" data-act="goals">Retour</button>`);
+    <button class="btn ghost block" type="button" data-act="close-sheet">Annuler</button>`);
   $('#gForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const name = $('#gName').value.trim(), target = parseMoney($('#gTarget').value), by = $('#gBy').value;
@@ -1473,11 +1536,11 @@ function sheetGoal(id) {
     if (err) { $('#gErr').textContent = err; $('#gErr').hidden = false; return; }
     if (g) Object.assign(g, { name, target, saved, by });
     else s.goals.push({ id: 'g' + uid(), name, target, saved, by, created: todayISO() });
-    persist('settings'); rerender(); sheetGoals();
+    persist('settings'); closeSheet(); rerender();
   });
   if (g) $('#gDel').addEventListener('click', () => {
     if (UI.confirm !== 'gdel') { UI.confirm = 'gdel'; $('#gDel').textContent = 'Confirmer la suppression'; return; }
-    s.goals = s.goals.filter(x => x.id !== g.id); persist('settings'); rerender(); sheetGoals();
+    s.goals = s.goals.filter(x => x.id !== g.id); persist('settings'); closeSheet(); rerender();
   });
 }
 function sheetCatIcon(id) {
@@ -1795,7 +1858,7 @@ function clearDemo() {
 function showTab(tab) {
   if (nativeOn()) endNative(false);
   UI.tab = tab;
-  for (const v of ['home', 'debts', 'wishes', 'stats', 'settings']) $('#v-' + v).hidden = tab !== v;
+  for (const v of ['dash', 'home', 'goals', 'debts', 'wishes', 'stats', 'settings']) $('#v-' + v).hidden = tab !== v;
   document.querySelectorAll('.tabs [data-tab]').forEach(b => { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   rerender();
   window.scrollTo(0, 0);
@@ -1803,6 +1866,8 @@ function showTab(tab) {
 function rerender() {
   if (rollPeriods()) persist('settings');
   if (UI.tab === 'home') renderHome();
+  else if (UI.tab === 'dash') renderDash();
+  else if (UI.tab === 'goals') renderGoals();
   else if (UI.tab === 'debts') renderDebts();
   else if (UI.tab === 'stats') renderStats();
   else if (UI.tab === 'wishes') renderWishes();
@@ -1841,7 +1906,7 @@ document.addEventListener('click', (e) => {
     case 'method': S.settings.method = t.dataset.m; persist('settings'); renderDebts(); break;
     case 'month': UI.statsMonth = addMonths(UI.statsMonth, Number(t.dataset.d)); renderStats(); break;
     case 'native-kb': startNative(); break;
-    case 'goals': sheetGoals(); break;
+    case 'goals': showTab('goals'); break;
     case 'goal-new': sheetGoal(null); break;
     case 'goal-edit': sheetGoal(t.dataset.id); break;
     case 'kb-pref': S.settings.kb = t.dataset.v; UI.kbFail = false; persist('settings'); renderSettings(); break;
@@ -1877,8 +1942,8 @@ document.addEventListener('change', (e) => {
   const el = e.target, f = el.dataset && el.dataset.field, s = S.settings;
   if (el.id === 'budgetIn') { const v = parseMoney(el.value); if (v != null && !isNaN(v)) { s.debtBudget = v; persist('settings'); } renderDebts(); return; }
   if (el.id === 'leftoverToggle') { s.leftoverToDebt = el.checked; persist('settings'); renderDebts(); return; }
-  if (el.id === 'gDebtOn') { s.debtReserve = el.checked; if (el.checked) s.debtSince = todayISO(); persist('settings'); sheetGoals(); rerender(); return; }
-  if (el.id === 'gDebtBy') { s.debtGoalBy = el.value && el.value > todayISO() ? el.value : null; persist('settings'); sheetGoals(); rerender(); return; }
+  if (el.id === 'gDebtOn') { s.debtReserve = el.checked; if (el.checked) s.debtSince = todayISO(); persist('settings'); rerender(); return; }
+  if (el.id === 'gDebtBy') { s.debtGoalBy = el.value && el.value > todayISO() ? el.value : null; persist('settings'); rerender(); return; }
   if (!f) return;
   {
     const c = s.cats.find(x => x.id === el.dataset.id); if (!c) return;
@@ -1911,12 +1976,12 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) rere
 applyCache(loadCache());
 applyTheme();
 resetEntry();
-const HASH_TABS = { '#dettes': 'debts', '#souhaits': 'wishes', '#stats': 'stats', '#reglages': 'settings' };
+const HASH_TABS = { '#tableau': 'dash', '#objectifs': 'goals', '#dettes': 'debts', '#souhaits': 'wishes', '#stats': 'stats', '#reglages': 'settings' };
 showTab(HASH_TABS[location.hash] || 'home');
 window.addEventListener('hashchange', () => { if (HASH_TABS[location.hash]) showTab(HASH_TABS[location.hash]); });
 connect().then(() => { resetEntry(); rerender(); });
 
-window.__budget = { reserveFor, startNative, endNative, homeState, simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
+window.__budget = { renderDash, renderGoals, reserveFor, startNative, endNative, homeState, simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
 })();
 </script>
 </body>
