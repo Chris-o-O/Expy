@@ -143,8 +143,8 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .stat.home .k { color: #4A4A4A; }
 .sheet .row .d { white-space: normal; }
 .form label.chk { flex-direction: row; align-items: center; font-size: 14px; color: var(--fg); font-weight: 600; }
-.nat-add { display: none; }
-body.kb .nat-add { display: block; }
+body:not(.appkeys) .keypad { display: none; }
+body.appkeys .nat-add { display: none; }
 body.kb .keypad, body.kb .tabs, body.kb #banners, body.kb .stats3, body.kb .legend, body.kb .homehead, body.kb #recentHead, body.kb #recent { display: none; }
 body.kb .dial { --d: min(150px, 24vh); --d: min(150px, 24dvh); }
 body.kb .wrap { padding-bottom: 16px; }
@@ -328,11 +328,11 @@ body.kb .wrap { padding-bottom: 16px; }
   <section id="v-home" class="view">
     <div id="banners" style="display:flex;flex-direction:column;gap:8px"></div>
     <div class="homehead" id="homeHead"></div>
-    <div class="dial" id="dial">
+    <div class="dial" id="dial" data-act="native-kb">
       <svg id="ring" viewBox="0 0 240 240" role="img" aria-label="Budget de la période"></svg>
       <div class="dial-c">
         <div class="dial-k" id="dialK">Saisie</div>
-        <div class="amount" id="amount" data-act="native-kb"><input class="big num" id="amtIn" type="text" inputmode="none" readonly autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="0" aria-label="Montant de la dépense"><span class="cur">$</span></div>
+        <div class="amount" id="amount"><input class="big num" id="amtIn" type="text" inputmode="none" readonly autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="0" aria-label="Montant de la dépense"><span class="cur">$</span></div>
         <div class="dial-n" id="dialN" aria-live="polite"></div>
       </div>
     </div>
@@ -769,6 +769,7 @@ function renderAmount() {
   if (!FIELD_SIZING) inp.style.width = 'calc(' + Math.max(1, txt.length) + 'ch + .15em)';
   $('#amount').dataset.l = txt.length > 8 ? 'xl' : txt.length > 5 ? 'l' : '';
   $('#amount').classList.toggle('can-kb', canKb());
+  document.body.classList.toggle('appkeys', !canKb());
   $('#dialK').innerHTML = 'Saisie' + (canKb() ? KB_SVG : '');
   const ok = amtCents() > 0; $('#addBtn').disabled = !ok; $('#addBtn2').disabled = !ok;
   renderRing();
@@ -823,7 +824,7 @@ function startNative() {
 }
 function endNative(fail) {
   const inp = $('#amtIn');
-  if (fail) UI.kbFail = true;
+  if (fail) { UI.kbFail = true; toast("Clavier de l'appareil indisponible : pavé intégré affiché"); }
   inp.readOnly = true; inp.setAttribute('inputmode', 'none');
   if (document.activeElement === inp) inp.blur();
   document.body.classList.remove('kb');
@@ -843,10 +844,10 @@ function renderChips() {
   if (on) { const b = box.getBoundingClientRect(), r = on.getBoundingClientRect(); if (r.left < b.left + 8) box.scrollLeft += r.left - b.left - 16; else if (r.right > b.right - 8) box.scrollLeft += r.right - b.right + 16; }
 }
 function renderHomeToggle() { $('#homeToggle').setAttribute('aria-pressed', String(!!UI.home)); }
-function resetEntry() {
+function resetEntry(keepKb) {
   UI.amt = ''; UI.catPicked = false; UI.homePicked = false; UI.cat = suggestCat(0); UI.home = !!catById(UI.cat).home;
   $('#noteIn').value = ''; $('#dateIn').value = todayISO();
-  if (nativeOn()) endNative(false);
+  if (nativeOn() && !keepKb) endNative(false);
   UI.optsOpen = false; $('#opts').hidden = true; $('#optsBtn').setAttribute('aria-expanded', 'false');
   renderAmount(); renderChips(); renderHomeToggle();
 }
@@ -876,7 +877,7 @@ function addExpense() {
     msg = lvAfter === 100 ? `Seuil dépassé de ${money(after - th)}` : `80 % du seuil atteint. Il reste ${money(th - after)}`;
     kind = lvAfter === 100 ? 'alert' : 'alertw';
   }
-  resetEntry();
+  resetEntry(nativeOn());
   renderHome();
   toast(msg, () => {
     S.months[mk] = itemsOf(mk).filter(i => i.id !== item.id);
@@ -1372,7 +1373,7 @@ function renderSettings() {
       <div class="seg" role="group" aria-label="Clavier">
         ${[['native', 'Appareil'], ['app', 'Intégré']].map(([v, l]) => `<button data-act="kb-pref" data-v="${v}" aria-pressed="${s.kb === v}">${l}</button>`).join('')}
       </div>
-      <div class="note">Appareil : touche le montant pour ouvrir le clavier numérique du téléphone. S'il ne s'ouvre pas, le pavé intégré reste affiché.</div>
+      <div class="note">Appareil : touche le montant pour ouvrir le clavier numérique du téléphone. Le pavé intégré ne s'affiche que si le clavier de l'appareil ne s'ouvre pas.</div>
     </div>
     <div class="card"><h2>Données</h2><div class="note">${esc(status)}</div>
       <div class="btn-row">
@@ -1387,7 +1388,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.6</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.6.1</p>`;
 }
 
 /* ---------- Sheets ---------- */
