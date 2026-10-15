@@ -970,7 +970,7 @@ function addExpense() {
   const after = before + amt;
   const cat = catById(item.cat);
   let msg = shared ? `${money(total)} · ${cat.name} · ma part ${money(amt)}` : `${money(amt)} · ${cat.name}`;
-  if (cat.limit) { const cs = sumC(itemsOf(mk).filter(i => i.cat === cat.id)); msg += ` (${money0(cs)} sur ${money0(cat.limit)} ce mois-ci)`; }
+  if (cat.limit) { const cs = sumC(itemsOf(mk).filter(i => i.cat === cat.id)); msg += ` (seuil de la catégorie : ${money0(cs)} sur ${money0(cat.limit)} ce mois-ci)`; }
   let kind = '';
   const lvBefore = level(before, th), lvAfter = level(after, th);
   if (isActive && lvAfter > lvBefore && lvAfter > (S.settings.alerts[per.id] || 0)) {
@@ -1582,7 +1582,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.8.1</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.8.2</p>`;
 }
 
 /* ---------- Sheets ---------- */
