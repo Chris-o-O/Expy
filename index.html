@@ -224,6 +224,14 @@ body.kb .wrap { padding-bottom: 16px; }
 .meter { height: 8px; border-radius: 999px; background: rgba(10,10,10,.14); overflow: hidden; margin-top: 8px; }
 .meter > i { display: block; height: 100%; border-radius: 999px; background: #0A0A0A; }
 
+/* Sharing */
+.split-row { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.sp-line { display: flex; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+.sp-line::-webkit-scrollbar { display: none; }
+.sp-k { font-size: 12px; font-weight: 700; color: var(--muted); flex: none; min-width: 58px; }
+.chip.sm { padding: 5px 12px; font-size: 13.5px; }
+.tag.share { color: var(--accent); border: 1px solid var(--accent); }
+.toggle.sm { padding: 5px 12px 5px 8px; }
 /* Dashboard + goals */
 .dline { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; margin-top: 8px; font-size: 13.5px; font-weight: 700; width: 100%; }
 .dline .d { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -367,6 +375,10 @@ body.kb .wrap { padding-bottom: 16px; }
       <div class="opts-row">
         <button class="toggle" id="homeToggle" data-act="toggle-home" aria-pressed="false"><span class="sw"></span>Faisable à la maison</button>
         <button class="link" id="optsBtn" data-act="toggle-opts" aria-expanded="false">Note, date</button>
+      </div>
+      <div class="split-row" id="splitRow">
+        <button class="toggle" id="splitToggle" data-act="toggle-split" aria-pressed="false"><span class="sw"></span>Partagé</button>
+        <div id="splitCtl" style="display:flex;flex-direction:column;gap:6px;width:100%" hidden></div>
       </div>
       <div class="opts" id="opts" hidden>
         <input class="field" id="noteIn" type="text" maxlength="80" placeholder="Note (facultatif)" autocomplete="off">
@@ -513,7 +525,7 @@ function defaultSettings() {
     wishes: [], wishCushion: 0, wishRate: null, wishAfterDebts: false,
     leftoverToDebt: true, reviewed: {},
     alerts: {}, lastExport: null, theme: 'auto',
-    goals: [], debtReserve: false, debtGoalBy: null, debtSince: null, kb: 'native',
+    people: [], settles: [], lastSplit: null, goals: [], debtReserve: false, debtGoalBy: null, debtSince: null, kb: 'native',
   };
 }
 const DEFAULT_CATS = [
@@ -585,6 +597,10 @@ function normalize(st) {
     s.catsV = 3;
   }
   if (!['auto', 'light', 'dark'].includes(s.theme)) s.theme = 'auto';
+  if (!Array.isArray(s.people)) s.people = [];
+  s.people = s.people.filter(p => p && p.id && p.name).map(p => Object.assign({ since: '' }, p));
+  if (!Array.isArray(s.settles)) s.settles = [];
+  if (!s.lastSplit || typeof s.lastSplit !== 'object') s.lastSplit = null;
   if (!Array.isArray(s.goals)) s.goals = [];
   s.goals = s.goals.filter(g => g && typeof g.target === 'number' && g.target > 0 && typeof g.by === 'string')
     .map(g => Object.assign({ id: 'g' + uid(), name: 'Objectif' }, g, { saved: Math.max(0, +g.saved || 0) }));
@@ -595,7 +611,7 @@ function normalize(st) {
   return s;
 }
 const S = { settings: defaultSettings(), months: {}, dirty: new Set(), mode: 'local', persisted: null, dl: null };
-const UI = { tab: 'home', amt: '', cat: null, catPicked: false, home: false, homePicked: false, optsOpen: false, statsMonth: curMonth(), toastTimer: null, confirm: null, installEvt: null };
+const UI = { split: { on: false, pid: null, pct: 50, by: 'me' }, tab: 'home', amt: '', cat: null, catPicked: false, home: false, homePicked: false, optsOpen: false, statsMonth: curMonth(), toastTimer: null, confirm: null, installEvt: null };
 
 /* Storage: everything stays on this phone (localStorage), with persistent storage requested
    so the browser does not evict it. Export / restore covers a phone change. */
@@ -781,6 +797,45 @@ function debtSim(budget) {
 const payoffLabel = (k) => k == null ? 'jamais à ce rythme' : monthLabel(addMonths(curMonth(), k));
 
 /* ---------- Entry (home) ---------- */
+const personName = (pid) => { const p = S.settings.people.find(x => x.id === pid); return p ? p.name : 'ancien contact'; };
+function shareItems(pid) {
+  const p = S.settings.people.find(x => x.id === pid), since = (p && p.since) || '';
+  return allItems().filter(i => i.split && i.split.pid === pid && i.ts > since).sort((a, b) => a.ts.localeCompare(b.ts));
+}
+// > 0: the other person owes me; < 0: I owe them
+function shareBalance(pid) {
+  const p = S.settings.people.find(x => x.id === pid), since = (p && p.since) || '';
+  let b = 0;
+  for (const i of shareItems(pid)) b += i.split.by === 'me' ? i.split.total - i.amt : -i.amt;
+  for (const x of S.settings.settles) if (x.pid === pid && x.ts > since) b -= x.amt;
+  return b;
+}
+function shareRecap(pid) {
+  const p = S.settings.people.find(x => x.id === pid); if (!p) return '';
+  const items = shareItems(pid), bal = shareBalance(pid), L = [`Relevé Expy · ${p.name}`];
+  for (const i of items) {
+    const sp = i.split, c = catById(i.cat).name, lbl = i.note ? `${c} (${i.note})` : c;
+    const part = sp.by === 'me' ? sp.total - i.amt : i.amt;
+    L.push(`• ${shortDate(dayOfItem(i))} · ${lbl} · ${money(sp.total)} payé par ${sp.by === 'me' ? 'moi' : p.name} → ${sp.by === 'me' ? 'ta part' : 'ma part'} : ${money(part)}`);
+  }
+  for (const x of S.settings.settles) if (x.pid === pid && x.ts > (p.since || '')) L.push(`• ${shortDate(isoOf(new Date(x.ts)))} · remboursement : ${money(Math.abs(x.amt))}`);
+  L.push(bal > 0 ? `Total : tu me dois ${money(bal)}` : bal < 0 ? `Total : je te dois ${money(-bal)}` : 'Total : quitte');
+  return L.join('\n');
+}
+function entryCost() { const t = amtCents(), sp = UI.split; return sp.on && S.settings.people.some(p => p.id === sp.pid) ? Math.round(t * sp.pct / 100) : t; }
+function renderSplit() {
+  const s = S.settings, sp = UI.split;
+  $('#splitToggle').setAttribute('aria-pressed', String(sp.on));
+  const ctl = $('#splitCtl'); ctl.hidden = !sp.on;
+  if (sp.on) {
+    if (!s.people.some(p => p.id === sp.pid)) sp.pid = s.people[0] ? s.people[0].id : null;
+    const who = s.people.find(p => p.id === sp.pid);
+    ctl.innerHTML = `<div class="sp-line"><span class="sp-k">Avec</span>${s.people.map(p => `<button class="chip sm" data-act="split-person" data-id="${esc(p.id)}" aria-pressed="${p.id === sp.pid}">${esc(p.name)}</button>`).join('')}<button class="chip sm" data-act="person-new">+ Personne</button></div>`
+      + (who ? `<div class="sp-line"><span class="sp-k">Payé par</span><button class="chip sm" data-act="split-by" data-v="me" aria-pressed="${sp.by === 'me'}">Moi</button><button class="chip sm" data-act="split-by" data-v="them" aria-pressed="${sp.by === 'them'}">${esc(who.name)}</button></div>
+      <div class="sp-line"><span class="sp-k">Ma part</span>${[0, 25, 33, 50, 67, 75].map(v => `<button class="chip sm" data-act="split-pct" data-v="${v}" aria-pressed="${sp.pct === v}">${v} %</button>`).join('')}</div>` : '');
+  }
+  renderRing();
+}
 function amtCents() {
   if (!UI.amt) return 0;
   const [i, d = ''] = UI.amt.split(',');
@@ -877,17 +932,21 @@ function resetEntry(keepKb) {
   $('#noteIn').value = ''; $('#dateIn').value = todayISO();
   if (nativeOn() && !keepKb) endNative(false);
   UI.optsOpen = false; $('#opts').hidden = true; $('#optsBtn').setAttribute('aria-expanded', 'false');
-  renderAmount(); renderChips(); renderHomeToggle();
+  { const ls = S.settings.lastSplit; UI.split = { on: false, pid: ls ? ls.pid : null, pct: ls ? ls.pct : 50, by: ls ? ls.by : 'me' }; }
+  renderAmount(); renderChips(); renderHomeToggle(); renderSplit();
 }
 function addExpense() {
-  const amt = amtCents();
-  if (amt <= 0) return;
+  const total = amtCents();
+  if (total <= 0) return;
+  const sp = UI.split, shared = sp.on && S.settings.people.some(p => p.id === sp.pid);
+  const amt = shared ? Math.round(total * sp.pct / 100) : total;
   const dateStr = $('#dateIn').value;
   let ts;
   if (!dateStr || dateStr === todayISO()) ts = new Date().toISOString();
   else { const [y, m, d] = dateStr.split('-').map(Number); ts = new Date(y, m - 1, d, 12, 0).toISOString(); }
   const mk = monthKey(new Date(ts));
   const item = { id: uid(), amt, cat: UI.cat, ts, home: !!UI.home, note: $('#noteIn').value.trim() };
+  if (shared) { item.split = { pid: sp.pid, total, pct: sp.pct, by: sp.by }; S.settings.lastSplit = { pid: sp.pid, pct: sp.pct, by: sp.by }; persist('settings'); }
   const per = periodFor(dayOfItem(item));
   const isActive = per && per === activePeriod();
   const before = per ? sumC(itemsIn(per)) : 0;
@@ -896,7 +955,7 @@ function addExpense() {
   const th = per ? per.amount : null;
   const after = before + amt;
   const cat = catById(item.cat);
-  let msg = `${money(amt)} · ${cat.name}`;
+  let msg = shared ? `${money(total)} · ${cat.name} · ma part ${money(amt)}` : `${money(amt)} · ${cat.name}`;
   if (cat.limit) { const cs = sumC(itemsOf(mk).filter(i => i.cat === cat.id)); msg += ` (${money0(cs)} sur ${money0(cat.limit)} ce mois-ci)`; }
   let kind = '';
   const lvBefore = level(before, th), lvAfter = level(after, th);
@@ -950,7 +1009,7 @@ function renderSummary() {
 }
 function renderRing() {
   const h = UI.hs; if (!h) return;
-  const e = amtCents(), C = RING_C;
+  const e = entryCost(), C = RING_C;
   const arc = (a, l, color, cap) => l > 0.0004 ? `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" stroke-linecap="${cap || 'butt'}" style="stroke:${color}" stroke-dasharray="${(l * C).toFixed(1)} ${(C - l * C + 2).toFixed(1)}" stroke-dashoffset="${(-a * C).toFixed(1)}" transform="rotate(-90 120 120)"/>` : '';
   let svg = `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" style="stroke:var(--surface-2)"/>`, note, label;
   if (h.per) {
@@ -1019,8 +1078,8 @@ function rowHTML(it) {
   const c = catById(it.cat);
   return `<li><button class="row" data-act="edit-item" data-id="${esc(it.id)}">
     <span class="dot" style="background:${esc(c.color)}"></span>
-    <span class="main"><span class="t">${esc(c.name)}${it.note ? ' · <span class="muted" style="font-weight:500">' + esc(it.note) + '</span>' : ''}</span><span class="d">${esc(dateLabel(it.ts))}</span></span>
-    ${it.home ? '<span class="tag home">maison</span>' : ''}${it.ex ? '<span class="tag ex">ex.</span>' : ''}
+    <span class="main"><span class="t">${esc(c.name)}${it.note ? ' · <span class="muted" style="font-weight:500">' + esc(it.note) + '</span>' : ''}</span><span class="d">${esc(dateLabel(it.ts))}${it.split ? ' · sur ' + money0(it.split.total) : ''}</span></span>
+    ${it.split ? `<span class="tag share">${esc(personName(it.split.pid))}</span>` : ''}${it.home ? '<span class="tag home">maison</span>' : ''}${it.ex ? '<span class="tag ex">ex.</span>' : ''}
     <span class="amt num">${money(it.amt)}</span></button></li>`;
 }
 function renderRecent() {
@@ -1029,7 +1088,7 @@ function renderRecent() {
     ? `<ul class="list">${items.map(rowHTML).join('')}</ul>`
     : `<div class="empty">Aucune dépense pour l'instant. Tape un montant, choisis une catégorie, puis Ajouter.</div>`;
 }
-function renderHome() { renderSummary(); renderBanners(); renderRecent(); renderChips(); }
+function renderHome() { renderSummary(); renderBanners(); renderRecent(); renderChips(); renderSplit(); }
 
 /* ---------- Dashboard ---------- */
 function dashData() {
@@ -1074,15 +1133,19 @@ function renderDash() {
   </button></li>`;
   const kinds = [['debts', 'Dettes remboursées', 'Dettes'], ['goals', 'Objectifs', 'Objectifs'], ['wishes', 'Souhaits', 'Souhaits']].filter(k => dd[k[0]]);
   let body = `<div class="view-head"><h1>Tableau de bord</h1></div>`;
-  if (!kinds.length) {
+  if (!kinds.length && !s.people.length) {
     $('#v-dash').innerHTML = body + `<div class="empty">Ajoute une dette, un objectif ou un souhait pour suivre ici leur progression.</div>
       <div class="btn-row" style="justify-content:center"><button class="btn ghost" data-act="tab" data-tab="debts">Dettes</button><button class="btn ghost" data-act="tab" data-tab="goals">Objectifs</button><button class="btn ghost" data-act="tab" data-tab="wishes">Souhaits</button></div>`;
     return;
   }
   const h = per ? homeState() : null;
-  body += `<div class="card hero"><div class="big3">${kinds.map(k => `<div><span class="k">${k[2]}</span><span class="v num">${dd[k[0]].p}<small> %</small></span></div>`).join('')}</div>
+  if (kinds.length) body += `<div class="card hero"><div class="big3">${kinds.map(k => `<div><span class="k">${k[2]}</span><span class="v num">${dd[k[0]].p}<small> %</small></span></div>`).join('')}</div>
     ${h && h.per ? `<div class="note">Période en cours : ${money0(h.left)} libres sur ${money0(h.amount)}${h.rs.total ? ` (${money0(h.rs.total)} réservés)` : ''} · jour ${h.elapsed} / ${h.len}.</div>` : ''}</div>`;
-  body += `<ul class="list stack">${kinds.map(k => card(k[0] === 'debts' ? 'debts' : k[0], k[1], dd[k[0]])).join('')}</ul>
+  const shareLi = s.people.length ? `<li><div class="debt">
+    <span class="l1"><span class="name">Partage</span></span>
+    ${s.people.map(p => { const b = shareBalance(p.id); return `<button class="dline" data-act="share-open" data-id="${esc(p.id)}" style="border:0;background:transparent;text-align:left;padding:0;margin-top:8px;color:inherit;font-family:inherit"><span>${esc(p.name)}</span><span class="num">${b === 0 ? 'Quitte' : (b > 0 ? 'te doit ' : 'tu dois ') + money(Math.abs(b))}</span></button>`; }).join('')}
+  </div></li>` : '';
+  body += `<ul class="list stack">${kinds.map(k => card(k[0], k[1], dd[k[0]])).join('')}${shareLi}</ul>
     <p class="note">Dettes : part déjà remboursée d'après les paiements enregistrés. Souhaits : avancement vers la date estimée d'achat.</p>`;
   $('#v-dash').innerHTML = body;
 }
@@ -1505,7 +1568,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.7</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.8</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -1514,6 +1577,56 @@ function closeSheet() { $('#sheet').hidden = true; $('#sheetPanel').innerHTML = 
 
 // Edit a budget period, or create one (id null). Defaults for a new one: the day after the latest period,
 // for the same length and amount; with no period yet, the current calendar month.
+function sheetPerson() {
+  openSheet(`<h1>Nouvelle personne</h1>
+    <form class="form" id="peForm">
+      <label>Prénom<input class="field" id="peName" maxlength="24" placeholder="ex. Alex" autofocus></label>
+      <div class="warntext" id="peErr" hidden></div>
+      <button class="btn block" type="submit">Ajouter</button>
+    </form>`);
+  $('#peForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = $('#peName').value.trim();
+    if (!name) { $('#peErr').textContent = 'Indique un prénom.'; $('#peErr').hidden = false; return; }
+    const p = { id: 'u' + uid(), name, since: '' };
+    S.settings.people.push(p);
+    UI.split.pid = p.id; UI.split.on = true;
+    persist('settings'); closeSheet(); rerender();
+  });
+}
+async function sendText(title, text) {
+  try { if (navigator.share) { await navigator.share({ title, text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); toast('Relevé copié'); } catch (e) { toast('Copie impossible dans cette vue'); }
+}
+function sheetShare(pid) {
+  const s = S.settings, p = s.people.find(x => x.id === pid); if (!p) return;
+  const bal = shareBalance(pid), items = shareItems(pid).reverse();
+  const head = bal > 0 ? `${esc(p.name)} te doit` : bal < 0 ? `Tu dois à ${esc(p.name)}` : 'Quitte';
+  openSheet(`<h1>${esc(p.name)}</h1>
+    <div class="card hero"><div class="free"><span class="note">${head}</span><span class="v num">${bal ? money(Math.abs(bal)) : '0 $'}</span></div></div>
+    ${items.length ? `<ul class="list">${items.slice(0, 12).map(i => `<li><button class="row" data-act="edit-item" data-id="${esc(i.id)}"><span class="main"><span class="t">${esc(catById(i.cat).name)}${i.note ? ' · <span class="muted" style="font-weight:500">' + esc(i.note) + '</span>' : ''}</span><span class="d">${esc(dateLabel(i.ts))} · ${money0(i.split.total)} payé par ${i.split.by === 'me' ? 'toi' : esc(p.name)}</span></span><span class="amt num">${money(i.split.by === 'me' ? i.split.total - i.amt : -i.amt)}</span></button></li>`).join('')}</ul>
+    ${items.length > 12 ? `<div class="note">${items.length - 12} dépenses plus anciennes dans le relevé.</div>` : ''}` : '<div class="note">Aucune dépense partagée depuis le dernier règlement.</div>'}
+    ${bal ? `<form class="form" id="stForm"><label>${bal > 0 ? 'Remboursement reçu ($)' : 'Remboursement versé ($)'}<input class="field num" id="stAmt" inputmode="decimal" value="${esc(toInputMoney(Math.abs(bal)))}"></label>
+      <button class="btn block" type="submit">Enregistrer le remboursement</button></form>` : ''}
+    <button class="btn ghost block" id="stSend" type="button">Envoyer le relevé</button>
+    <button class="btn ghost block" id="stCopy" type="button">Copier le relevé</button>
+    <button class="btn danger block" id="stDel" type="button">Supprimer cette personne</button>`);
+  if (bal) $('#stForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const amt = parseMoney($('#stAmt').value);
+    if (amt == null || isNaN(amt) || amt <= 0) { $('#stAmt').focus(); return; }
+    const now = new Date().toISOString();
+    if (amt >= Math.abs(bal)) { s.settles.push({ id: uid(), pid, amt: bal, ts: now }); p.since = now; }
+    else s.settles.push({ id: uid(), pid, amt: (bal > 0 ? 1 : -1) * amt, ts: now });
+    persist('settings'); closeSheet(); rerender(); toast(amt >= Math.abs(bal) ? `Quitte avec ${p.name}` : `Remboursement de ${money(amt)} noté`);
+  });
+  $('#stSend').addEventListener('click', () => sendText(`Relevé Expy · ${p.name}`, shareRecap(pid)));
+  $('#stCopy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(shareRecap(pid)); toast('Relevé copié'); } catch (e) { toast('Copie impossible dans cette vue'); } });
+  $('#stDel').addEventListener('click', () => {
+    if (UI.confirm !== 'pdel') { UI.confirm = 'pdel'; $('#stDel').textContent = 'Confirmer la suppression'; return; }
+    s.people = s.people.filter(x => x.id !== pid); persist('settings'); closeSheet(); rerender();
+  });
+}
 function sheetGoal(id) {
   const s = S.settings, g = id ? s.goals.find(x => x.id === id) : null;
   const yEnd = new Date().getFullYear() + '-12-31';
@@ -1619,18 +1732,21 @@ function sheetItem(id) {
   const { it } = f;
   const d = new Date(it.ts);
   const dIso = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-  const state = { cat: it.cat, home: it.home };
+  const state = { cat: it.cat, home: it.home, by: it.split ? it.split.by : null };
   openSheet(`<h1>Modifier la dépense</h1>
     <form class="form" id="itForm">
-      <div class="two"><label>Montant ($)<input class="field num" id="itAmt" inputmode="decimal" value="${esc(toInputMoney(it.amt))}"></label>
+      <div class="two"><label>Montant ${it.split ? 'total ' : ''}($)<input class="field num" id="itAmt" inputmode="decimal" value="${esc(toInputMoney(it.split ? it.split.total : it.amt))}"></label>
       <label>Date<input class="field" id="itDate" type="date" value="${dIso}"></label></div>
       <div class="chips" id="itCats">${S.settings.cats.map(c => `<button type="button" class="chip" data-cat="${esc(c.id)}" aria-pressed="${c.id === it.cat}"><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.name)}</button>`).join('')}</div>
       <button type="button" class="toggle" id="itHome" aria-pressed="${!!it.home}"><span class="sw"></span>Faisable à la maison</button>
+      ${it.split ? `<div class="two"><label>Ma part (%)<input class="field num" id="itPct" inputmode="decimal" value="${esc(String(it.split.pct).replace('.', ','))}"></label>
+        <div class="form"><label>Payé par</label><div class="sp-line"><button type="button" class="chip sm" data-by="me" aria-pressed="${it.split.by === 'me'}">Moi</button><button type="button" class="chip sm" data-by="them" aria-pressed="${it.split.by === 'them'}">${esc(personName(it.split.pid))}</button></div></div></div>` : ''}
       <label>Note<input class="field" id="itNote" maxlength="80" value="${esc(it.note || '')}"></label>
       <button class="btn block" type="submit">Enregistrer</button>
       <button class="btn danger block" type="button" id="itDel">Supprimer</button>
     </form>`);
   $('#itCats').addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; state.cat = b.dataset.cat; for (const x of $('#itCats').children) x.setAttribute('aria-pressed', String(x.dataset.cat === state.cat)); });
+  if (it.split) $('#itForm').addEventListener('click', (e) => { const b = e.target.closest('[data-by]'); if (!b) return; state.by = b.dataset.by; for (const x of $('#itForm').querySelectorAll('[data-by]')) x.setAttribute('aria-pressed', String(x.dataset.by === state.by)); });
   $('#itHome').addEventListener('click', () => { state.home = !state.home; $('#itHome').setAttribute('aria-pressed', String(state.home)); });
   $('#itDel').addEventListener('click', () => {
     if (UI.confirm !== 'del') { UI.confirm = 'del'; $('#itDel').textContent = 'Confirmer la suppression'; return; }
@@ -1647,6 +1763,10 @@ function sheetItem(id) {
     let ts = g.it.ts;
     if (ds && ds !== dIso) { const [y, m, dd] = ds.split('-').map(Number); ts = new Date(y, m - 1, dd, 12, 0).toISOString(); }
     const upd = Object.assign({}, g.it, { amt, cat: state.cat, home: state.home, note: $('#itNote').value.trim(), ts });
+    if (g.it.split) {
+      const pv = parseFloat(String($('#itPct').value).replace(',', '.')), pc = isNaN(pv) ? g.it.split.pct : Math.max(0, Math.min(100, pv));
+      upd.split = Object.assign({}, g.it.split, { total: amt, pct: pc, by: state.by }); upd.amt = Math.round(amt * pc / 100);
+    }
     const nk = monthKey(new Date(ts));
     S.months[g.mk] = itemsOf(g.mk).filter(i => i.id !== id);
     (S.months[nk] = S.months[nk] || []).push(upd);
@@ -1777,10 +1897,10 @@ async function save(filename, data) {
   catch (e) { if (e && e.code === 'declined') return false; toast(e && e.code === 'rate_limited' ? 'Un enregistrement est déjà en cours.' : "L'export n'a pas pu se faire ici."); return false; }
 }
 function exportCSV() {
-  const rows = [['date', 'montant', 'categorie', 'faisable_maison', 'note']];
+  const rows = [['date', 'montant', 'categorie', 'faisable_maison', 'note', 'montant_total', 'partage_avec']];
   allItems().sort((a, b) => a.ts.localeCompare(b.ts)).forEach(i => {
     const d = new Date(i.ts);
-    rows.push([d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()), (i.amt / 100).toFixed(2).replace('.', ','), catById(i.cat).name, i.home ? 'oui' : 'non', i.note || '']);
+    rows.push([d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()), (i.amt / 100).toFixed(2).replace('.', ','), catById(i.cat).name, i.home ? 'oui' : 'non', i.note || '', i.split ? (i.split.total / 100).toFixed(2).replace('.', ',') : '', i.split ? personName(i.split.pid) : '']);
   });
   save(`depenses-${todayISO()}.csv`, '﻿' + rows.map(r => r.map(csvCell).join(';')).join('\r\n'));
 }
@@ -1906,6 +2026,12 @@ document.addEventListener('click', (e) => {
     case 'method': S.settings.method = t.dataset.m; persist('settings'); renderDebts(); break;
     case 'month': UI.statsMonth = addMonths(UI.statsMonth, Number(t.dataset.d)); renderStats(); break;
     case 'native-kb': startNative(); break;
+    case 'toggle-split': UI.split.on = !UI.split.on; renderSplit(); if (UI.split.on && !S.settings.people.length) sheetPerson(); break;
+    case 'split-person': UI.split.pid = t.dataset.id; renderSplit(); break;
+    case 'split-by': UI.split.by = t.dataset.v; renderSplit(); break;
+    case 'split-pct': UI.split.pct = Number(t.dataset.v); renderSplit(); break;
+    case 'person-new': sheetPerson(); break;
+    case 'share-open': sheetShare(t.dataset.id); break;
     case 'goals': showTab('goals'); break;
     case 'goal-new': sheetGoal(null); break;
     case 'goal-edit': sheetGoal(t.dataset.id); break;
@@ -1965,7 +2091,7 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'amtIn' && !e.target.readOnly) { e.preventDefault(); if (amtCents() > 0) addExpense(); else endNative(false); } });
 // Keep focus in the amount field while tapping tiles / toggle / Add, so the device keyboard stays up.
-document.addEventListener('mousedown', (e) => { if (nativeOn() && e.target.closest('.tile, #homeToggle, #addBtn2')) e.preventDefault(); });
+document.addEventListener('mousedown', (e) => { if (nativeOn() && e.target.closest('.tile, #homeToggle, #addBtn2, #splitToggle, #splitCtl button')) e.preventDefault(); });
 document.addEventListener('focusout', (e) => { if (e.target.id === 'amtIn') setTimeout(() => { const i = $('#amtIn'); if (!i.readOnly && document.activeElement !== i) endNative(false); }, 120); });
 // Keyboard dismissed (e.g. Android back) without a blur: return to the in-app keypad.
 if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (nativeOn() && UI.kbOK && viewH() > UI.kbH0 - 60) endNative(false); });
