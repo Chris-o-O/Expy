@@ -1401,23 +1401,25 @@ function confidence() {
   const sig = Math.max(sd, pf.pay * (pf.variable ? 0.15 : 0.08)) * Math.sqrt(1 + 1 / n);
   const over = rows.reduce((a, r) => a + r.over, 0) / n, payGap = rows.reduce((a, r) => a + r.payGap, 0) / n;
   // Needs per pay, served by deadline. Without a debt date, the debt share is a fixed commitment first.
-  const items = s.goals.filter(g => g.target > g.saved && g.by >= today).map(g => ({ id: g.id, by: g.by, need: (g.target - g.saved) / Math.max(1, (daysBetween(today, g.by) + 1) / payDays) }));
+  const items = s.goals.filter(g => g.target > g.saved && g.by >= today).map(g => ({ id: g.id, name: g.name, by: g.by, need: (g.target - g.saved) / Math.max(1, (daysBetween(today, g.by) + 1) / payDays) }));
   const dneed = s.debts.some(d => d.bal > 0) && s.debtGoalBy ? debtNeedFor(s, s.debtGoalBy, 0) : null;
-  if (dneed) items.push({ id: 'debt', by: s.debtGoalBy, need: dneed * 12 / PAY_FREQ[pf.freq][1] });
+  if (dneed) items.push({ id: 'debt', name: 'tes dettes', by: s.debtGoalBy, need: dneed * 12 / PAY_FREQ[pf.freq][1] });
   items.sort((a, b) => a.by.localeCompare(b.by));
-  let cum = dneed ? 0 : (s.debts.some(d => d.bal > 0) ? pf.debt : 0);
-  const out = {};
-  for (const it of items) {
-    cum += it.need;
-    const N = Math.max(1, (daysBetween(today, it.by) + 1) / payDays), pr = normCdf((mu - cum) / (sig / Math.sqrt(N)));
-    out[it.id] = Math.min(99, Math.max(1, Math.round(pr * 20) * 5));
-  }
+  const base = dneed ? 0 : (s.debts.some(d => d.bal > 0) ? pf.debt : 0);
+  const pct = (need, by) => { const N = Math.max(1, (daysBetween(today, by) + 1) / payDays); return Math.min(99, Math.max(1, Math.round(normCdf((mu - base - need) / (sig / Math.sqrt(N))) * 20) * 5)); };
+  const out = {}, by = {};
+  let cum = 0;
+  items.forEach((it, i) => {
+    cum += it.need; out[it.id] = pct(cum, it.by);
+    // Reachable on its own but not after the earlier deadlines: name the biggest one ahead of it.
+    if (out[it.id] < 50 && i > 0 && pct(it.need, it.by) >= 50) by[it.id] = items.slice(0, i).sort((a, b) => b.need - a.need)[0].name;
+  });
   let why;
   if (over > pf.pay * 0.03) why = `Tu dépenses en moyenne ${money0(over)} de plus que ton seuil par paie.`;
   else if (over < -pf.pay * 0.03) why = `Tu dépenses en moyenne ${money0(-over)} de moins que ton seuil par paie.`;
   else why = 'Tu respectes ton seuil.';
   if (payGap < -pf.pay * 0.05) why += ` Ta paie réelle est en moyenne ${money0(-payGap)} sous ton profil.`;
-  return { n, mu, out, why };
+  return { n, mu, out, by, why };
 }
 const confLabel = (p) => p >= 80 ? ['Atteignable', 'var(--ok)'] : p >= 50 ? ['Serré', 'var(--warn)'] : ['Peu probable', 'var(--bad)'];
 function confLine(c, id) {
@@ -1425,7 +1427,8 @@ function confLine(c, id) {
   if (!c.n) return `<span class="l2"><span>Confiance : pas assez de données (une période terminée requise)</span></span>`;
   const p = c.out[id]; if (p == null) return '';
   const [l, col] = confLabel(p);
-  return `<span class="l2"><span>Confiance : <b style="color:${col}">${l} · ${p} %</b></span></span>`;
+  return `<span class="l2"><span>Confiance : <b style="color:${col}">${l} · ${p} %</b></span></span>`
+    + (c.by[id] ? `<span class="l2"><span>Limité par ${esc(c.by[id])}, qui passe avant</span></span>` : '');
 }
 
 /* ---------- Goals view ---------- */
@@ -1866,7 +1869,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.11.0</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.11.1</p>`;
 }
 
 /* ---------- Sheets ---------- */
