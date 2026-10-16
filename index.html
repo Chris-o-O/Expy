@@ -1276,7 +1276,7 @@ function renderProfile(err) {
         : `<label>Date d'une paie (la dernière ou la prochaine)<input class="field" id="pfNext" type="date" value="${esc(pf.next)}"></label>`}
       <label>Âge (facultatif)<input class="field num" id="pfAge" inputmode="numeric" value="${pf.age ?? ''}" placeholder="Sert au repère d'épargne"></label>`;
   } else if (st === 1) {
-    const modes = [['common', 'Compte commun'], ['list', 'Je les liste'], ['none', 'Aucune']];
+    const modes = [['common', 'Compte commun'], ['list', 'Je paie seul'], ['none', 'Aucune']];
     h += `<div class="seg three" role="group" aria-label="Charges fixes">${modes.map(([k, l]) => `<button type="button" data-act="pf-fixed" data-m="${k}" aria-pressed="${pf.fixedMode === k}">${l}</button>`).join('')}</div>`;
     if (pf.fixedMode === 'common') h += field('Versement au compte commun, par paie ($)', 'pfCommon', pf.fixedCommon)
       + `<div class="note">Ce versement sort avant ton seuil. Ce qui est payé avec le compte commun n'a pas à être saisi dans Expy.</div>`;
@@ -1818,7 +1818,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.10.0</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.10.1</p>`;
 }
 
 /* ---------- Sheets ---------- */
