@@ -24,7 +24,9 @@ Tableau de bord · Saisie (écran de lancement) · Dettes · Objectifs · Souhai
 
 ## Règles de calcul
 - Seuil par période `{start,end,amount}`, renouvelée automatiquement ; stats par mois civil ; seuils de catégorie mensuels (mois civil).
-- Réserve (`reserveFor(p)`) : part du seuil mise de côté pour les dettes (case + date « libre d'ici », sinon budget mensuel de remboursement) et les objectifs d'épargne = restant × durée de la période ÷ jours jusqu'à l'échéance. Libre = seuil − réserve.
+- Réserve (`reserveFor(p)`) : part du seuil mise de côté pour les dettes (case « Prendre ce budget dans mon seuil » → budget mensuel de remboursement au prorata) et les objectifs d'épargne = restant × durée de la période ÷ jours jusqu'à l'échéance. Libre = seuil − réserve.
+- Dettes et objectifs sont séparés : tout ce qui touche les dettes (budget, date « libre d'ici » → `debtNeedFor()` donne le budget nécessaire, intérêts compris) vit dans l'onglet Dettes ; Objectifs = épargne seulement.
+- Feuille de route : v1.10 parcours « Mon profil » (paie, charges fixes, répartition, soldes de comptes en photo ; seuil auto modifiable ; proposé au 1er lancement + Réglages), v1.11 indice de confiance par objectif basé sur les dépenses réelles.
 - Dettes : intérêts mensuels = solde × taux / 12 ; minimums puis surplus à la dette prioritaire (avalanche = taux le plus élevé, boule de neige = plus petit solde).
 - Le reste sous le seuil (après réserve) alimente les dettes (option) puis les souhaits.
 

@@ -615,6 +615,12 @@ function normalize(st) {
     .map(g => Object.assign({ id: 'g' + uid(), name: 'Objectif' }, g, { saved: Math.max(0, +g.saved || 0) }));
   s.debtReserve = !!s.debtReserve;
   if (typeof s.debtGoalBy !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s.debtGoalBy)) s.debtGoalBy = null;
+  if ((st ? (st.debtsV || 1) : 2) < 2) {
+    // v1.9: the debt-free date moved to Dettes and no longer drives the reserve; keep the same effort as a budget.
+    const need = s.debtReserve && s.debtGoalBy ? debtNeedFor(s, s.debtGoalBy, 0) : null;
+    if (need && need > s.debtBudget) s.debtBudget = need;
+  }
+  s.debtsV = 2;
   if (s.kb !== 'app') s.kb = 'native';
   s.v = 2;
   return s;
@@ -770,7 +776,7 @@ function suggestCat(amtC) {
 function level(total, th) { if (!th) return 0; const p = total / th; return p >= 1 ? 100 : p >= 0.8 ? 80 : 0; }
 /* Reserve: part of each period's threshold set aside for debts and savings goals.
    Prorated by the period length: remaining amount x period days / days until the target date.
-   Debts: with a "debt-free by" date, the balance is spread to that date; without one, the monthly repayment budget is prorated. */
+   Debts: the monthly repayment budget (onglet Dettes) is prorated when "take it from my threshold" is on. */
 const DAYS_MO = 30.4375;
 function reserveFor(p) {
   const s = S.settings, L = periodLen(p);
@@ -778,8 +784,7 @@ function reserveFor(p) {
   const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
   let debt = 0;
   if (s.debtReserve && bal > 0 && !(s.debtSince && p.end < s.debtSince)) {
-    if (s.debtGoalBy && s.debtGoalBy >= p.start) debt = bal * L / spanTo(s.debtGoalBy);
-    else if (s.debtBudget > 0) debt = s.debtBudget * L / DAYS_MO;
+    if (s.debtBudget > 0) debt = s.debtBudget * L / DAYS_MO;
     debt = Math.min(Math.round(debt), bal);
   }
   const goals = [];
@@ -802,6 +807,18 @@ function leftoverExtra() {
 function debtSim(budget) {
   const s = S.settings;
   return simulate(s.debts, (budget ?? s.debtBudget) + leftoverExtra(), s.method);
+}
+// Smallest monthly repayment budget (cents) that clears every debt by the month of `by`, interest included.
+function debtNeedFor(s, by, extra) {
+  if (!by) return null;
+  const k = (+by.slice(0, 4) * 12 + +by.slice(5, 7)) - (+curMonth().slice(0, 4) * 12 + +curMonth().slice(5, 7));
+  const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
+  if (k < 1 || bal <= 0) return null;
+  const ok = (b) => { const r = simulate(s.debts, b + (extra || 0), s.method); return r.months != null && r.months <= k && !r.short; };
+  let lo = 0, hi = Math.ceil(bal * 1.2) + 10000;
+  if (!ok(hi)) return null;
+  while (hi - lo > 100) { const mid = Math.floor((lo + hi) / 2); if (ok(mid)) hi = mid; else lo = mid; }
+  return Math.ceil(hi / 100) * 100;
 }
 const payoffLabel = (k) => k == null ? 'jamais à ce rythme' : monthLabel(addMonths(curMonth(), k));
 
@@ -1167,24 +1184,13 @@ function renderDash() {
 /* ---------- Goals view ---------- */
 function renderGoals() {
   const s = S.settings, per = activePeriod(), rs = per ? reserveFor(per) : null;
-  const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
-  let dnote = '';
-  if (bal > 0) {
-    if (s.debtGoalBy) dnote = `Pour être libre d'ici le ${shortDate(s.debtGoalBy, true)}, il faut environ ${money0(bal / Math.max(1, (daysBetween(todayISO(), s.debtGoalBy) + 1) / DAYS_MO))} par mois (sans les intérêts).`;
-    else if (s.debtBudget > 0) dnote = `Sans date, la réserve suit ton budget de remboursement : ${money0(s.debtBudget)} par mois.`;
-    else dnote = `Sans date et sans budget de remboursement, rien n'est réservé. Indique l'un des deux.`;
-  }
   let body = `<div class="view-head"><h1>Objectifs</h1><button class="btn" data-act="goal-new">Ajouter</button></div>`;
   body += `<div class="card hero">${rs ? `<div class="kv">
       <div><span class="k">Seuil</span><span class="v num">${money0(per.amount)}</span></div>
-      <div><span class="k">Réservé</span><span class="v num">${money0(rs.total)}</span></div>
+      <div><span class="k">Épargne</span><span class="v num">${money0(rs.save)}</span></div>
       <div><span class="k">Libre</span><span class="v num">${money0(per.amount - rs.total)}</span></div></div>
-      <div class="note">Période de ${periodLen(per)} jours. Chaque objectif prend une part du seuil proportionnelle à la durée de la période, retirée de ce que tu peux dépenser.</div>`
+      <div class="note">Période de ${periodLen(per)} jours. Chaque objectif prend une part du seuil proportionnelle à la durée de la période, retirée de ce que tu peux dépenser.${rs.debt ? ` Le libre tient aussi compte de ${money0(rs.debt)} pour les dettes (onglet Dettes).` : ''}</div>`
     : `<div class="note">Définis une période et un seuil pour voir la part réservée à chaque objectif.</div>`}</div>`;
-  body += `<div class="card"><h2>Dettes</h2>
-    ${bal > 0 ? `<label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="gDebtOn" ${s.debtReserve ? 'checked' : ''}>Réserver pour rembourser mes dettes (${money0(bal)})</label>
-    <label class="form" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:700;color:var(--muted)">Libre de dettes d'ici (facultatif)<input class="field" id="gDebtBy" type="date" value="${esc(s.debtGoalBy || '')}"></label>
-    <div class="note">${esc(dnote)}</div>` : `<div class="note">Aucune dette suivie. Ajoute-en une dans l'onglet Dettes.</div>`}</div>`;
   if (!s.goals.length) body += `<div class="empty">Aucun objectif d'épargne. Exemple : 1 200 $ d'ici la fin de l'année. Expy en réserve une part à chaque période.</div>`;
   else body += `<ul class="list stack">${s.goals.map(g => {
     const a = rs ? (rs.goals.find(x => x.id === g.id) || { amt: 0 }).amt : 0, p = Math.min(100, Math.round(g.saved / g.target * 100));
@@ -1229,7 +1235,8 @@ function renderDebts() {
     </div>
     <div class="note" id="budgetNote">${budgetNoteText(s.debtBudget, sumMin)}</div>
     <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="leftoverToggle" ${s.leftoverToDebt ? 'checked' : ''}>Ajouter le reste de chaque période sous le seuil</label>
-    <button class="link" data-act="goals" style="text-align:left;padding:0">${s.debtReserve ? 'Une part de chaque période est réservée aux dettes' : 'Réserver une part de chaque période'} · Onglet Objectifs ›</button>
+    <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="dDebtOn" ${s.debtReserve ? 'checked' : ''}>Prendre ce budget dans mon seuil de dépenses</label>
+    <div class="note">${s.debtReserve ? (s.debtBudget > 0 ? `${money0(s.debtBudget)} par mois sont mis de côté sur ton seuil, au prorata de chaque période.` : 'Indique un budget pour qu\'il soit mis de côté sur ton seuil.') : 'Le remboursement est payé à part, ton seuil reste entier.'}</div>
     ${sim.short ? `<div class="warntext">Le budget est sous la somme des minimums (${money(sumMin)}).</div>` : ''}
     ${sim.never && !sim.short ? `<div class="warntext">À ce budget, au moins une dette ne sera jamais remboursée.</div>` : ''}
     <div class="seg" role="group" aria-label="Méthode">
@@ -1237,7 +1244,8 @@ function renderDebts() {
       <button data-act="method" data-m="snowball" aria-pressed="${s.method === 'snowball'}">Boule de neige</button>
     </div>
     <div class="note">${s.method === 'snowball' ? "L'extra va au plus petit solde. Plus de victoires rapides, un peu plus d'intérêts." : "L'extra va au taux le plus élevé. Le moins d'intérêts au total."}</div>
-  </div>`;
+  </div>
+  ${active.length ? debtByCard(sim) : ''}`;
   const ordered = [...active].sort((a, b) => (sim.payoff[a.id] ?? 1e9) - (sim.payoff[b.id] ?? 1e9));
   body += `<ul class="list stack" id="debtList">${[...ordered, ...paid].map(d => {
     const k = sim.payoff[d.id];
@@ -1251,6 +1259,21 @@ function renderDebts() {
   }).join('')}</ul>
   <p class="note">Les dates supposent que le budget mensuel${s.leftoverToDebt ? ', plus le reste moyen sous ton seuil,' : ''} est payé chaque mois. Quand une dette est soldée, son paiement passe à la suivante.${lastUpd ? ' Soldes mis à jour le ' + esc(shortDate(lastUpd, true)) + '.' : ''}</p>`;
   $('#v-debts').innerHTML = body;
+}
+// Optional "debt-free by" date: shows the monthly budget it takes, interest included.
+function debtByCard(sim) {
+  const s = S.settings, by = s.debtGoalBy;
+  let note = 'Choisis une date pour voir combien il faut rembourser par mois.', btn = '';
+  if (by) {
+    const extra = leftoverExtra(), need = debtNeedFor(s, by, extra);
+    const k = (+by.slice(0, 4) * 12 + +by.slice(5, 7)) - (+curMonth().slice(0, 4) * 12 + +curMonth().slice(5, 7));
+    if (need == null) note = 'Date trop proche pour tout rembourser.';
+    else if (sim.months != null && sim.months <= k) note = `Ton budget suffit : libre en ${payoffLabel(sim.months)}. Le minimum pour ta date : ${money0(need)} par mois${extra ? ' (avec ton reste moyen)' : ''}.`;
+    else { note = `Pour y arriver : ${money0(need)} par mois, intérêts compris${extra ? ' (avec ton reste moyen)' : ''}. Ton budget actuel : ${money0(s.debtBudget)}.`; btn = `<button class="btn" data-act="debt-use-need" data-v="${need}">Utiliser ${money0(need)} par mois</button>`; }
+  }
+  return `<div class="card"><label class="form" style="display:flex;flex-direction:column;gap:4px"><h2>Libre de dettes d'ici</h2>
+    <input class="field" id="dDebtBy" type="date" value="${esc(by || '')}"></label>
+    <div class="note">${esc(note)}</div>${btn}</div>`;
 }
 function budgetNoteText(v, sumMin) {
   let t = `Minimums ${money0(sumMin)} + extra ${money0(Math.max(v - sumMin, 0))}`;
@@ -1582,7 +1605,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.8.3</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.9.0</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -2048,6 +2071,7 @@ document.addEventListener('click', (e) => {
     case 'share-open': sheetShare(t.dataset.id); break;
     case 'goals': showTab('goals'); break;
     case 'goal-new': sheetGoal(null); break;
+    case 'debt-use-need': S.settings.debtBudget = +t.dataset.v; persist('settings'); toast('Budget de remboursement mis à jour'); rerender(); break;
     case 'goal-edit': sheetGoal(t.dataset.id); break;
     case 'kb-pref': S.settings.kb = t.dataset.v; UI.kbFail = false; persist('settings'); renderSettings(); break;
     case 'cat-icon': sheetCatIcon(t.dataset.id); break;
@@ -2082,8 +2106,8 @@ document.addEventListener('change', (e) => {
   const el = e.target, f = el.dataset && el.dataset.field, s = S.settings;
   if (el.id === 'budgetIn') { const v = parseMoney(el.value); if (v != null && !isNaN(v)) { s.debtBudget = v; persist('settings'); } renderDebts(); return; }
   if (el.id === 'leftoverToggle') { s.leftoverToDebt = el.checked; persist('settings'); renderDebts(); return; }
-  if (el.id === 'gDebtOn') { s.debtReserve = el.checked; if (el.checked) s.debtSince = todayISO(); persist('settings'); rerender(); return; }
-  if (el.id === 'gDebtBy') { s.debtGoalBy = el.value && el.value > todayISO() ? el.value : null; persist('settings'); rerender(); return; }
+  if (el.id === 'dDebtOn') { s.debtReserve = el.checked; if (el.checked) s.debtSince = todayISO(); persist('settings'); rerender(); return; }
+  if (el.id === 'dDebtBy') { s.debtGoalBy = el.value && el.value > todayISO() ? el.value : null; persist('settings'); rerender(); return; }
   if (!f) return;
   {
     const c = s.cats.find(x => x.id === el.dataset.id); if (!c) return;
