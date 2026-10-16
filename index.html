@@ -628,7 +628,13 @@ function normalize(st) {
   s.accounts = s.accounts.filter(a => a && a.id && typeof a.bal === 'number').map(a => Object.assign({ name: 'Compte', kind: 'cheque', updated: '' }, a));
   const pf = s.profile;
   s.profile = pf && typeof pf === 'object' && pf.pay > 0 && PAY_FREQ[pf.freq] && /^\d{4}-\d{2}-\d{2}$/.test(pf.next || '')
-    ? Object.assign({ variable: false, age: null, semi: '15-end', fixedMode: 'none', fixedCommon: 0, fixedItems: [], save: 0, debt: 0 }, pf) : null;
+    ? Object.assign({ variable: false, age: null, semi: '15-end', fixedCommon: 0, fixedItems: [], save: 0, debt: 0 }, pf) : null;
+  if (s.profile && typeof s.profile.common !== 'boolean') {
+    // v1.12: joint-account transfer and personal list can both apply; before, only the chosen mode counted.
+    s.profile.common = s.profile.fixedMode === 'common';
+    if (s.profile.fixedMode !== 'list') s.profile.fixedItems = [];
+  }
+  if (s.profile) delete s.profile.fixedMode;
   if (s.profile && !Array.isArray(s.profile.fixedItems)) s.profile.fixedItems = [];
   s.profileSkip = !!s.profileSkip;
   s.v = 2;
@@ -1197,7 +1203,8 @@ function renderDash() {
 const PAY_FREQ = { biweekly: ['Aux 2 semaines', 26], semimonthly: ['2 fois par mois', 24], monthly: ['1 fois par mois', 12], weekly: ['Chaque semaine', 52] };
 const perPay = (monthly, freq) => Math.round(monthly * 12 / PAY_FREQ[freq][1]);
 const perMonth = (pp, freq) => Math.round(pp * PAY_FREQ[freq][1] / 12);
-const pfFixed = (pf) => pf.fixedMode === 'common' ? pf.fixedCommon : pf.fixedMode === 'list' ? perPay(pf.fixedItems.reduce((a, i) => a + i.amt, 0), pf.freq) : 0;
+const pfListPP = (pf) => perPay(pf.fixedItems.reduce((a, i) => a + i.amt, 0), pf.freq);
+const pfFixed = (pf) => (pf.common ? pf.fixedCommon : 0) + pfListPP(pf);
 const pfSpend = (pf) => pf.pay - pfFixed(pf) - pf.save - pf.debt;
 function payDatesIn(pf, y, m) {
   const last = new Date(y, m + 1, 0).getDate(), mk = (d) => isoOf(new Date(y, m, Math.min(d, last)));
@@ -1243,7 +1250,7 @@ function debtReco(pf) {
 function pfDraft() {
   const s = S.settings;
   if (s.profile) return JSON.parse(JSON.stringify(s.profile));
-  return { pay: 0, variable: false, freq: 'biweekly', semi: '15-end', next: todayISO(), age: null, fixedMode: 'none', fixedCommon: 0, fixedItems: [],
+  return { pay: 0, variable: false, freq: 'biweekly', semi: '15-end', next: todayISO(), age: null, common: false, fixedCommon: 0, fixedItems: [],
     save: 0, debt: perPay(s.debtBudget || 0, 'biweekly') };
 }
 function openProfile(step) { UI.pf = pfDraft(); UI.pfStep = step || 0; renderProfile(); }
@@ -1258,7 +1265,7 @@ function pfRead() {
     const a = parseInt($('#pfAge').value, 10); pf.age = a >= 14 && a <= 100 ? a : null;
     if (!pf.pay) return 'Indique ta paie nette.';
   }
-  if (st === 1 && pf.fixedMode === 'common') pf.fixedCommon = pfVal('pfCommon') || 0;
+  if (st === 1) { pf.common = $('#pfCommonOn').checked; if ($('#pfCommon')) pf.fixedCommon = pfVal('pfCommon') || 0; }
   if (st === 3) { pf.save = pfVal('pfSave') || 0; pf.debt = pfVal('pfDebt') || 0; }
   return '';
 }
@@ -1276,15 +1283,14 @@ function renderProfile(err) {
         : `<label>Date d'une paie (la dernière ou la prochaine)<input class="field" id="pfNext" type="date" value="${esc(pf.next)}"></label>`}
       <label>Âge (facultatif)<input class="field num" id="pfAge" inputmode="numeric" value="${pf.age ?? ''}" placeholder="Sert au repère d'épargne"></label>`;
   } else if (st === 1) {
-    const modes = [['common', 'Compte commun'], ['list', 'Je paie seul'], ['none', 'Aucune']];
-    h += `<div class="seg three" role="group" aria-label="Charges fixes">${modes.map(([k, l]) => `<button type="button" data-act="pf-fixed" data-m="${k}" aria-pressed="${pf.fixedMode === k}">${l}</button>`).join('')}</div>`;
-    if (pf.fixedMode === 'common') h += field('Versement au compte commun, par paie ($)', 'pfCommon', pf.fixedCommon)
-      + `<div class="note">Ce versement sort avant ton seuil. Ce qui est payé avec le compte commun n'a pas à être saisi dans Expy.</div>`;
-    else if (pf.fixedMode === 'list') h += `${pf.fixedItems.map(i => `<div class="dline pfrow"><span>${esc(i.name)}</span><span class="num">${money0(i.amt)}/mois</span><button type="button" class="icon-btn" data-act="pf-fix-del" data-id="${esc(i.id)}" aria-label="Retirer ${esc(i.name)}">×</button></div>`).join('')}
-      <div class="two"><input class="field" id="pfFixName" maxlength="24" placeholder="ex. Loyer"><input class="field num" id="pfFixAmt" inputmode="decimal" placeholder="$ / mois"></div>
+    h += `<h2>Compte commun</h2><label class="chk"><input type="checkbox" id="pfCommonOn" ${pf.common ? 'checked' : ''}>Je verse un montant au compte commun</label>`;
+    if (pf.common) h += field('Versement au compte commun, par paie ($)', 'pfCommon', pf.fixedCommon)
+      + `<div class="note">Ce qui est payé avec le compte commun n'a pas à être saisi dans Expy.</div>`;
+    h += `<h2>Charges que je paie seul</h2>${pf.fixedItems.map(i => `<div class="dline pfrow"><span>${esc(i.name)}</span><span class="num">${money0(i.amt)}/mois</span><button type="button" class="icon-btn" data-act="pf-fix-del" data-id="${esc(i.id)}" aria-label="Retirer ${esc(i.name)}">×</button></div>`).join('')}
+      <div class="two"><input class="field" id="pfFixName" maxlength="24" placeholder="ex. Téléphone"><input class="field num" id="pfFixAmt" inputmode="decimal" placeholder="$ / mois"></div>
       <button type="button" class="btn ghost" data-act="pf-fix-add">Ajouter la charge</button>
-      <div class="note">${pf.fixedItems.length ? `Total : ${money0(pfFixed(pf))} par paie. ` : ''}Loyer, téléphone, assurances, abonnements… Ces montants sortent avant ton seuil.</div>`;
-    else h += `<div class="note">Tout ce que tu paies passera par ton seuil de dépenses courantes.</div>`;
+      <div class="note">Loyer, téléphone, assurances, abonnements… Laisse vide si tout passe par le compte commun.</div>
+      <div class="note"><b>Total des charges fixes : <span id="pfFixTot">${money0(pfFixed(pf))}</span> par paie.</b> Elles sortent avant ton seuil ; le reste de tes dépenses passe par le seuil.</div>`;
   } else if (st === 2) {
     const kinds = { cheque: 'Chèque', epargne: 'Épargne' };
     h += `<h2>Comptes</h2>${s.accounts.map(a => `<div class="dline pfrow"><span>${esc(a.name)} <span class="muted">· ${kinds[a.kind] || ''}</span></span>
@@ -1346,7 +1352,6 @@ function profileAct(a, t) {
   if (a === 'pf-next') { if (err) { renderProfile(err); return; } UI.pfStep++; renderProfile(); }
   else if (a === 'pf-back') { UI.pfStep--; renderProfile(); }
   else if (a === 'pf-done') pfApply();
-  else if (a === 'pf-fixed') { pf.fixedMode = t.dataset.m; renderProfile(); }
   else if (a === 'pf-fix-add') {
     const name = $('#pfFixName').value.trim(), amt = pfVal('pfFixAmt');
     if (!name || !amt) { renderProfile('Indique le nom et le montant par mois.'); return; }
@@ -1869,7 +1874,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.11.1</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.12.0</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -2371,11 +2376,12 @@ document.addEventListener('input', (e) => {
   if (e.target.id === 'amtIn') { onNativeInput(e.target); return; }
   if (e.target.id === 'budgetIn') { const v = parseMoney(e.target.value); if (v != null && !isNaN(v)) previewBudget(v); }
   if (e.target.id === 'pfSave' || e.target.id === 'pfDebt') pfPreview();
+  if (e.target.id === 'pfCommon' && $('#pfFixTot')) $('#pfFixTot').textContent = money0((pfVal('pfCommon') || 0) + pfListPP(UI.pf));
 });
 document.addEventListener('change', (e) => {
   const el = e.target, f = el.dataset && el.dataset.field, s = S.settings;
   if (el.id === 'budgetIn') { const v = parseMoney(el.value); if (v != null && !isNaN(v)) { s.debtBudget = v; persist('settings'); } renderDebts(); return; }
-  if (el.id === 'pfFreq' || el.id === 'pfVar') { pfRead(); renderProfile(); return; }
+  if (el.id === 'pfFreq' || el.id === 'pfVar' || el.id === 'pfCommonOn') { pfRead(); renderProfile(); return; }
   if (el.dataset && (el.dataset.pfacc || el.dataset.pfdebt)) {
     const v = parseMoney(el.value), x = el.dataset.pfacc ? s.accounts.find(a => a.id === el.dataset.pfacc) : s.debts.find(d => d.id === el.dataset.pfdebt);
     if (x && v != null && !isNaN(v)) { x.bal = el.dataset.pfdebt ? Math.max(0, v) : v; if (el.dataset.pfacc) x.updated = todayISO(); else x.updated = new Date().toISOString(); persist('settings'); }
