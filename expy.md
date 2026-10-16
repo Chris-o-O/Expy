@@ -30,7 +30,7 @@ Tableau de bord · Saisie (écran de lancement) · Dettes · Objectifs · Souhai
 - Repère d'épargne (`saveReco`) : 10 % (<30 ans), 15 % (30-44), 20 % (45-54), 25 % (55+) ; −5 pts sous 40 000 $ net/an, +5 au-dessus de 90 000 $ ; min 5 % ; relevé si les objectifs demandent plus. C'est un repère, pas un conseil.
 - Comptes (`settings.accounts`) : photo des soldes (chèque/épargne), valeur nette au tableau de bord. Pas de suivi des virements.
 - Profil proposé au 1er lancement (« Passer »), bandeau pour les utilisateurs existants (« Plus tard » → `profileSkip`), refaisable dans Réglages.
-- Feuille de route : v1.11 indice de confiance par objectif basé sur les dépenses réelles (et la paie variable).
+- Indice de confiance (`confidence()`, v1.11, profil requis) : périodes terminées des 120 derniers jours, ramenées à une paie ; capacité = paie reçue (`period.paid`, saisie au bilan de fin de période, sinon paie du profil) − fixes − dépensé. Moyenne μ, écart-type σ (plancher 8 % de la paie, 15 % si variable, gonflé si peu de périodes). Objectifs et date « libre de dettes » servis par échéance ; besoin cumulé (sans date de dettes, la part dettes passe d'abord) ; P = Φ((μ − cumul) / (σ/√N paies)). ≥ 80 % Atteignable, ≥ 50 % Serré, sinon Peu probable. Explication : écart moyen au seuil, paie réelle sous le profil.
 - Dettes : intérêts mensuels = solde × taux / 12 ; minimums puis surplus à la dette prioritaire (avalanche = taux le plus élevé, boule de neige = plus petit solde).
 - Le reste sous le seuil (après réserve) alimente les dettes (option) puis les souhaits.
 
