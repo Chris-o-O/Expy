@@ -245,6 +245,7 @@ body.kb .wrap { padding-bottom: 16px; }
 .dline { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; margin-top: 8px; font-size: 13.5px; font-weight: 700; width: 100%; }
 .dline .d { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--muted); }
 .dline .meter { grid-column: 1 / -1; height: 5px; margin-top: 3px; }
+.dline.pfrow { grid-template-columns: 1fr auto auto; align-items: center; }
 .big3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .big3 > div { display: flex; flex-direction: column; min-width: 0; }
 .big3 .k { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--hero-sub); font-weight: 700; }
@@ -535,6 +536,7 @@ function defaultSettings() {
     leftoverToDebt: true, reviewed: {},
     alerts: {}, lastExport: null, theme: 'auto',
     people: [], settles: [], lastSplit: null, goals: [], debtReserve: false, debtGoalBy: null, debtSince: null, kb: 'native',
+    profile: null, profileSkip: false, accounts: [],
   };
 }
 const DEFAULT_CATS = [
@@ -622,6 +624,13 @@ function normalize(st) {
   }
   s.debtsV = 2;
   if (s.kb !== 'app') s.kb = 'native';
+  if (!Array.isArray(s.accounts)) s.accounts = [];
+  s.accounts = s.accounts.filter(a => a && a.id && typeof a.bal === 'number').map(a => Object.assign({ name: 'Compte', kind: 'cheque', updated: '' }, a));
+  const pf = s.profile;
+  s.profile = pf && typeof pf === 'object' && pf.pay > 0 && PAY_FREQ[pf.freq] && /^\d{4}-\d{2}-\d{2}$/.test(pf.next || '')
+    ? Object.assign({ variable: false, age: null, semi: '15-end', fixedMode: 'none', fixedCommon: 0, fixedItems: [], save: 0, debt: 0 }, pf) : null;
+  if (s.profile && !Array.isArray(s.profile.fixedItems)) s.profile.fixedItems = [];
+  s.profileSkip = !!s.profileSkip;
   s.v = 2;
   return s;
 }
@@ -730,6 +739,7 @@ function nextPeriod(p) {
   const s = dateOf(p.start);
   const monthly = isoOf(new Date(s.getFullYear(), s.getMonth() + 1, s.getDate() - 1)) === p.end;
   const start = addDays(p.end, 1);
+  if (p.auto && S.settings.profile) return { id: 'p' + uid(), start, end: payPeriodAt(S.settings.profile, start).end, amount: p.amount, auto: true };
   let end;
   if (monthly) { const n = dateOf(start); end = isoOf(new Date(n.getFullYear(), n.getMonth() + 1, n.getDate() - 1)); }
   else end = addDays(start, periodLen(p) - 1);
@@ -794,8 +804,8 @@ function reserveFor(p) {
     const amt = Math.min(Math.round(rem * L / spanTo(g.by)), rem);
     if (amt > 0) goals.push({ id: g.id, name: g.name, amt });
   }
-  const save = goals.reduce((a, g) => a + g.amt, 0);
-  return { debt, goals, save, total: debt + save };
+  const need = goals.reduce((a, g) => a + g.amt, 0), save = s.profile ? 0 : need;
+  return { debt, goals, save, need, total: debt + save };
 }
 // Average monthly amount left under the threshold (finished periods), added to debt repayment when enabled.
 function leftoverExtra() {
@@ -1092,6 +1102,8 @@ function renderBanners() {
       <span><b>Période du ${esc(shortDate(rv.start))} au ${esc(shortDate(rv.end))} terminée.</b> ${left >= 0 ? `Il te reste ${money(left)} sous le seuil.` : `Seuil dépassé de ${money(-left)}.`} ${S.settings.debts.some(d => d.bal > 0) ? 'As-tu remboursé ta carte ? Mets tes soldes à jour.' : 'Verse la part réservée à tes objectifs.'}</span>
       <span style="display:flex;gap:8px;justify-content:flex-end"><button class="link" data-act="review-later">Plus tard</button><button class="btn" data-act="review" data-id="${esc(rv.id)}">Mettre à jour</button></span></div>`);
   }
+  if (!S.settings.profile && !S.settings.profileSkip && (allItems().length || S.settings.periods.length || S.settings.debts.length))
+    out.push(`<div class="banner"><span>Configure ton profil : ta paie et ta répartition donnent ton seuil.</span><span style="display:flex;gap:8px"><button class="link" data-act="pf-later">Plus tard</button><button class="btn" data-act="pf-open">Configurer</button></span></div>`);
   const hasEx = allItems().some(i => i.ex) || S.settings.debts.some(d => d.ex) || S.settings.wishes.some(w => w.ex) || S.settings.goals.some(g => g.ex);
   if (hasEx) out.push(`<div class="banner ex"><span>Données d'exemple affichées.</span><button class="link" data-act="clear-demo">Tout effacer</button></div>`);
   const anyData = allItems().length || S.settings.debts.length;
@@ -1163,7 +1175,7 @@ function renderDash() {
     ${o.rows.length > 4 ? `<span class="l2"><span>+ ${o.rows.length - 4} autre${o.rows.length - 4 > 1 ? 's' : ''}</span></span>` : ''}
   </button></li>`;
   const kinds = [['debts', 'Dettes remboursées', 'Dettes'], ['goals', 'Objectifs', 'Objectifs'], ['wishes', 'Souhaits', 'Souhaits']].filter(k => dd[k[0]]);
-  let body = `<div class="view-head"><h1>Tableau de bord</h1></div>`;
+  let body = `<div class="view-head"><h1>Tableau de bord</h1></div>` + accountsCard();
   if (!kinds.length && !s.people.length) {
     $('#v-dash').innerHTML = body + `<div class="empty">Ajoute une dette, un objectif ou un souhait pour suivre ici leur progression.</div>
       <div class="btn-row" style="justify-content:center"><button class="btn ghost" data-act="tab" data-tab="debts">Dettes</button><button class="btn ghost" data-act="tab" data-tab="goals">Objectifs</button><button class="btn ghost" data-act="tab" data-tab="wishes">Souhaits</button></div>`;
@@ -1181,11 +1193,210 @@ function renderDash() {
   $('#v-dash').innerHTML = body;
 }
 
+/* ---------- Profil : paie, charges fixes, comptes, répartition ---------- */
+const PAY_FREQ = { biweekly: ['Aux 2 semaines', 26], semimonthly: ['2 fois par mois', 24], monthly: ['1 fois par mois', 12], weekly: ['Chaque semaine', 52] };
+const perPay = (monthly, freq) => Math.round(monthly * 12 / PAY_FREQ[freq][1]);
+const perMonth = (pp, freq) => Math.round(pp * PAY_FREQ[freq][1] / 12);
+const pfFixed = (pf) => pf.fixedMode === 'common' ? pf.fixedCommon : pf.fixedMode === 'list' ? perPay(pf.fixedItems.reduce((a, i) => a + i.amt, 0), pf.freq) : 0;
+const pfSpend = (pf) => pf.pay - pfFixed(pf) - pf.save - pf.debt;
+function payDatesIn(pf, y, m) {
+  const last = new Date(y, m + 1, 0).getDate(), mk = (d) => isoOf(new Date(y, m, Math.min(d, last)));
+  if (pf.freq === 'monthly') return [mk(+pf.next.slice(8, 10))];
+  return pf.semi === '1-15' ? [mk(1), mk(15)] : [mk(15), mk(last)];
+}
+// The pay period containing `day`: from a pay date to the day before the next one.
+function payPeriodAt(pf, day) {
+  if (pf.freq === 'weekly' || pf.freq === 'biweekly') {
+    const L = pf.freq === 'weekly' ? 7 : 14, start = addDays(pf.next, Math.floor(daysBetween(pf.next, day) / L) * L);
+    return { start, end: addDays(start, L - 1) };
+  }
+  const d = dateOf(day), ds = [];
+  for (let i = -1; i <= 1; i++) { const x = new Date(d.getFullYear(), d.getMonth() + i, 1); ds.push(...payDatesIn(pf, x.getFullYear(), x.getMonth())); }
+  ds.sort();
+  return { start: ds.filter(x => x <= day).pop(), end: addDays(ds.find(x => x > day), -1) };
+}
+// Per-pay amount the savings goals need to hit their dates.
+function goalsNeedPerPay(freq) {
+  const today = todayISO(), payDays = 365.25 / PAY_FREQ[freq][1];
+  return Math.ceil(S.settings.goals.reduce((a, g) => {
+    const rem = g.target - g.saved;
+    return rem > 0 && g.by >= today ? a + rem / Math.max(1, (daysBetween(today, g.by) + 1) / payDays) : a;
+  }, 0) / 100) * 100;
+}
+/* Savings benchmark (a rule of thumb, not advice): 10 % under 30, 15 % at 30-44, 20 % at 45-54, 25 % after;
+   5 points less under 40 000 $ net a year, 5 more above 90 000 $; never under 5 %. Goals can raise it. */
+function saveReco(pf) {
+  const annual = pf.pay * PAY_FREQ[pf.freq][1] / 100;
+  let rate = pf.age == null || pf.age < 30 ? 10 : pf.age < 45 ? 15 : pf.age < 55 ? 20 : 25;
+  if (annual < 40000) rate -= 5; else if (annual > 90000) rate += 5;
+  rate = Math.max(5, rate);
+  const min = Math.ceil(pf.pay * rate / 10000) * 100, goals = goalsNeedPerPay(pf.freq);
+  return { rate, min, goals, reco: Math.max(min, goals) };
+}
+function debtReco(pf) {
+  const s = S.settings, act = s.debts.filter(d => d.bal > 0);
+  if (!act.length) return null;
+  const sumMin = act.reduce((a, d) => a + d.min, 0), need = debtNeedFor(s, s.debtGoalBy, 0);
+  return { min: Math.ceil(perPay(sumMin, pf.freq) / 100) * 100, date: need ? Math.ceil(perPay(need, pf.freq) / 100) * 100 : null,
+    hot: act.reduce((a, d) => Math.max(a, d.apr), 0) };
+}
+function pfDraft() {
+  const s = S.settings;
+  if (s.profile) return JSON.parse(JSON.stringify(s.profile));
+  return { pay: 0, variable: false, freq: 'biweekly', semi: '15-end', next: todayISO(), age: null, fixedMode: 'none', fixedCommon: 0, fixedItems: [],
+    save: 0, debt: perPay(s.debtBudget || 0, 'biweekly') };
+}
+function openProfile(step) { UI.pf = pfDraft(); UI.pfStep = step || 0; renderProfile(); }
+const pfVal = (id) => { const el = $('#' + id); if (!el) return null; const v = parseMoney(el.value); return v == null || isNaN(v) ? null : Math.max(0, v); };
+// Reads the current step's fields into the draft; returns an error message or ''.
+function pfRead() {
+  const pf = UI.pf, st = UI.pfStep;
+  if (st === 0) {
+    pf.pay = pfVal('pfPay') || 0; pf.variable = $('#pfVar').checked; pf.freq = $('#pfFreq').value;
+    if ($('#pfSemi')) pf.semi = $('#pfSemi').value;
+    if ($('#pfNext') && $('#pfNext').value) pf.next = $('#pfNext').value;
+    const a = parseInt($('#pfAge').value, 10); pf.age = a >= 14 && a <= 100 ? a : null;
+    if (!pf.pay) return 'Indique ta paie nette.';
+  }
+  if (st === 1 && pf.fixedMode === 'common') pf.fixedCommon = pfVal('pfCommon') || 0;
+  if (st === 3) { pf.save = pfVal('pfSave') || 0; pf.debt = pfVal('pfDebt') || 0; }
+  return '';
+}
+function renderProfile(err) {
+  const s = S.settings, pf = UI.pf, st = UI.pfStep, first = !s.profile;
+  const steps = ['Ta paie', 'Charges fixes', 'Comptes et cartes', 'Répartition'];
+  const field = (label, id, v, extra) => `<label>${label}<input class="field num" id="${id}" inputmode="decimal" value="${v ? esc(toInputMoney(v)) : ''}" ${extra || ''}></label>`;
+  let h = `<h1>Mon profil</h1><div class="note">Étape ${st + 1} sur 4 · ${steps[st]}</div><div class="form">`;
+  if (st === 0) {
+    h += field('Paie nette (après impôts) ($)', 'pfPay', pf.pay, 'placeholder="ex. 1 850"')
+      + `<label class="chk"><input type="checkbox" id="pfVar" ${pf.variable ? 'checked' : ''}>Ma paie varie</label>
+      ${pf.variable ? '<div class="note">Indique une paie basse habituelle : Expy restera prudent.</div>' : ''}
+      <label>Fréquence<select class="field" id="pfFreq">${Object.entries(PAY_FREQ).map(([k, v]) => `<option value="${k}" ${pf.freq === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></label>
+      ${pf.freq === 'semimonthly' ? `<label>Jours de paie<select class="field" id="pfSemi"><option value="15-end" ${pf.semi !== '1-15' ? 'selected' : ''}>Le 15 et le dernier jour du mois</option><option value="1-15" ${pf.semi === '1-15' ? 'selected' : ''}>Le 1er et le 15</option></select></label>`
+        : `<label>Date d'une paie (la dernière ou la prochaine)<input class="field" id="pfNext" type="date" value="${esc(pf.next)}"></label>`}
+      <label>Âge (facultatif)<input class="field num" id="pfAge" inputmode="numeric" value="${pf.age ?? ''}" placeholder="Sert au repère d'épargne"></label>`;
+  } else if (st === 1) {
+    const modes = [['common', 'Compte commun'], ['list', 'Je les liste'], ['none', 'Aucune']];
+    h += `<div class="seg three" role="group" aria-label="Charges fixes">${modes.map(([k, l]) => `<button type="button" data-act="pf-fixed" data-m="${k}" aria-pressed="${pf.fixedMode === k}">${l}</button>`).join('')}</div>`;
+    if (pf.fixedMode === 'common') h += field('Versement au compte commun, par paie ($)', 'pfCommon', pf.fixedCommon)
+      + `<div class="note">Ce versement sort avant ton seuil. Ce qui est payé avec le compte commun n'a pas à être saisi dans Expy.</div>`;
+    else if (pf.fixedMode === 'list') h += `${pf.fixedItems.map(i => `<div class="dline pfrow"><span>${esc(i.name)}</span><span class="num">${money0(i.amt)}/mois</span><button type="button" class="icon-btn" data-act="pf-fix-del" data-id="${esc(i.id)}" aria-label="Retirer ${esc(i.name)}">×</button></div>`).join('')}
+      <div class="two"><input class="field" id="pfFixName" maxlength="24" placeholder="ex. Loyer"><input class="field num" id="pfFixAmt" inputmode="decimal" placeholder="$ / mois"></div>
+      <button type="button" class="btn ghost" data-act="pf-fix-add">Ajouter la charge</button>
+      <div class="note">${pf.fixedItems.length ? `Total : ${money0(pfFixed(pf))} par paie. ` : ''}Loyer, téléphone, assurances, abonnements… Ces montants sortent avant ton seuil.</div>`;
+    else h += `<div class="note">Tout ce que tu paies passera par ton seuil de dépenses courantes.</div>`;
+  } else if (st === 2) {
+    const kinds = { cheque: 'Chèque', epargne: 'Épargne' };
+    h += `<h2>Comptes</h2>${s.accounts.map(a => `<div class="dline pfrow"><span>${esc(a.name)} <span class="muted">· ${kinds[a.kind] || ''}</span></span>
+        <input class="field num" style="width:110px" data-pfacc="${esc(a.id)}" inputmode="decimal" value="${esc(toInputMoney(a.bal))}" aria-label="Solde de ${esc(a.name)}">
+        <button type="button" class="icon-btn" data-act="pf-acc-del" data-id="${esc(a.id)}" aria-label="Retirer ${esc(a.name)}">×</button></div>`).join('')}
+      <div class="two"><input class="field" id="pfAccName" maxlength="24" placeholder="ex. Compte chèque"><input class="field num" id="pfAccBal" inputmode="decimal" placeholder="Solde $"></div>
+      <div class="two"><select class="field" id="pfAccKind"><option value="cheque">Chèque</option><option value="epargne">Épargne</option></select><button type="button" class="btn ghost" data-act="pf-acc-add">Ajouter</button></div>
+      <h2>Cartes de crédit et dettes</h2>${s.debts.filter(d => d.bal > 0).map(d => `<div class="dline pfrow"><span>${esc(d.name)} <span class="muted">· ${String(d.apr).replace('.', ',')} %</span></span>
+        <input class="field num" style="width:110px" data-pfdebt="${esc(d.id)}" inputmode="decimal" value="${esc(toInputMoney(d.bal))}" aria-label="Solde de ${esc(d.name)}"><span style="width:32px"></span></div>`).join('')}
+      <div class="two"><input class="field" id="pfCardName" maxlength="24" placeholder="ex. Visa"><input class="field num" id="pfCardBal" inputmode="decimal" placeholder="Solde $"></div>
+      <div class="two"><input class="field num" id="pfCardApr" inputmode="decimal" placeholder="Taux % (ex. 20,99)"><button type="button" class="btn ghost" data-act="pf-card-add">Ajouter</button></div>
+      <div class="note">Une photo de tes soldes : mets-les à jour quand tu veux. Une carte payée au complet chaque mois n'a pas besoin d'être ajoutée. Le paiement minimum se règle dans l'onglet Dettes.</div>`;
+  } else {
+    const fx = pfFixed(pf), avail = pf.pay - fx, sr = saveReco(pf), dr = debtReco(pf);
+    h += `<div class="card hero" style="margin:0"><div class="kv">
+        <div><span class="k">Paie</span><span class="v num">${money0(pf.pay)}</span></div>
+        <div><span class="k">Fixes</span><span class="v num">${money0(fx)}</span></div>
+        <div><span class="k">Disponible</span><span class="v num">${money0(avail)}</span></div></div></div>
+      ${field('Épargne, par paie ($)', 'pfSave', pf.save)}
+      <div class="note">Repère : au moins ${money0(sr.min)} par paie (${sr.rate} % de ta paie, selon ${pf.age ? 'ton âge et ' : ''}ton revenu)${sr.goals > sr.min ? `. Tes objectifs demandent ${money0(sr.goals)} par paie` : ''}.${dr && dr.hot >= 10 ? ` Avec des dettes à ${String(dr.hot).replace('.', ',')} %, garde l'épargne près du repère et mets le reste sur les dettes.` : ''}</div>
+      <button type="button" class="btn ghost" data-act="pf-use" data-f="pfSave" data-v="${sr.reco}">Utiliser ${money0(sr.reco)}</button>
+      ${dr ? `${field('Dettes, par paie ($)', 'pfDebt', pf.debt)}
+      <div class="note">Minimums : ${money0(dr.min)} par paie.${dr.date ? ` Pour être libre à ta date : ${money0(dr.date)} par paie.` : ''}</div>
+      <button type="button" class="btn ghost" data-act="pf-use" data-f="pfDebt" data-v="${Math.max(dr.min, dr.date || 0)}">Utiliser ${money0(Math.max(dr.min, dr.date || 0))}</button>` : ''}
+      <div class="card" style="margin:0"><span class="note">Dépenses courantes (ton seuil)</span><div class="v num" id="pfSpend" style="font-size:28px;font-weight:800"></div><div class="note" id="pfSpendNote"></div></div>`;
+  }
+  h += `${err ? `<div class="warntext">${esc(err)}</div>` : ''}</div>
+    <div class="btn-row" style="justify-content:space-between">
+      ${st > 0 ? '<button type="button" class="btn ghost" data-act="pf-back">Retour</button>' : first ? '<button type="button" class="link" data-act="pf-skip">Passer</button>' : '<button type="button" class="btn ghost" data-act="close-sheet">Annuler</button>'}
+      <button type="button" class="btn" data-act="${st < 3 ? 'pf-next' : 'pf-done'}">${st < 3 ? 'Suivant' : 'Terminer'}</button></div>`;
+  openSheet(h);
+  if (st === 3) pfPreview();
+}
+function pfPreview() {
+  const pf = UI.pf, el = $('#pfSpend'); if (!el) return;
+  const v = pfSpend(Object.assign({}, pf, { save: pfVal('pfSave') || 0, debt: pfVal('pfDebt') || 0 }));
+  el.textContent = money0(v); el.style.color = v <= 0 ? 'var(--bad)' : '';
+  $('#pfSpendNote').textContent = v <= 0 ? 'Il ne reste rien pour les dépenses courantes : baisse l\'épargne ou les dettes.'
+    : `Par paie, ${PAY_FREQ[pf.freq][0].toLowerCase()}. Devient le seuil de chaque période, de paie en paie. Tu peux l'ajuster dans Réglages.`;
+}
+function pfApply() {
+  const s = S.settings, pf = UI.pf, spend = pfSpend(pf);
+  if (spend <= 0) { renderProfile('Il ne reste rien pour les dépenses courantes.'); return; }
+  pf.done = todayISO(); s.profile = pf; s.profileSkip = false;
+  if (s.debts.some(d => d.bal > 0)) { s.debtBudget = perMonth(pf.debt, pf.freq); s.debtReserve = false; }
+  // The current pay period becomes the active one; later ones follow the pay schedule.
+  const q = payPeriodAt(pf, todayISO());
+  s.periods = s.periods.filter(p => p.start < q.start);
+  for (const p of s.periods) if (p.end >= q.start) { const L = periodLen(p); p.end = addDays(q.start, -1); p.amount = Math.round(p.amount * periodLen(p) / L); }
+  s.periods.push({ id: 'p' + uid(), start: q.start, end: q.end, amount: spend, auto: true });
+  persist('settings'); closeSheet(); rerender(); toast(`Seuil : ${money0(spend)} par paie`);
+}
+function profileAct(a, t) {
+  const s = S.settings, pf = UI.pf;
+  if (a === 'pf-open') { openProfile(+(t.dataset.step || 0)); return; }
+  if (a === 'pf-skip') { s.profileSkip = true; persist('settings'); closeSheet(); rerender(); return; }
+  if (a === 'pf-later') { s.profileSkip = true; persist('settings'); rerender(); return; }
+  const err = pfRead();
+  if (a === 'pf-next') { if (err) { renderProfile(err); return; } UI.pfStep++; renderProfile(); }
+  else if (a === 'pf-back') { UI.pfStep--; renderProfile(); }
+  else if (a === 'pf-done') pfApply();
+  else if (a === 'pf-fixed') { pf.fixedMode = t.dataset.m; renderProfile(); }
+  else if (a === 'pf-fix-add') {
+    const name = $('#pfFixName').value.trim(), amt = pfVal('pfFixAmt');
+    if (!name || !amt) { renderProfile('Indique le nom et le montant par mois.'); return; }
+    pf.fixedItems.push({ id: 'f' + uid(), name, amt }); renderProfile();
+  }
+  else if (a === 'pf-fix-del') { pf.fixedItems = pf.fixedItems.filter(i => i.id !== t.dataset.id); renderProfile(); }
+  else if (a === 'pf-acc-add') {
+    const name = $('#pfAccName').value.trim(), bal = parseMoney($('#pfAccBal').value);
+    if (!name || bal == null || isNaN(bal)) { renderProfile('Indique le nom et le solde du compte.'); return; }
+    s.accounts.push({ id: 'a' + uid(), name, kind: $('#pfAccKind').value, bal, updated: todayISO() }); persist('settings'); renderProfile();
+  }
+  else if (a === 'pf-acc-del') { s.accounts = s.accounts.filter(x => x.id !== t.dataset.id); persist('settings'); renderProfile(); }
+  else if (a === 'pf-card-add') {
+    const name = $('#pfCardName').value.trim(), bal = pfVal('pfCardBal'), apr = parseFloat(($('#pfCardApr').value || '20,99').replace(',', '.'));
+    if (!name || !bal || isNaN(apr) || apr < 0 || apr > 99) { renderProfile('Indique le nom, le solde et le taux de la carte.'); return; }
+    s.debts.push({ id: 'd' + uid(), name, bal, apr, min: Math.max(1000, Math.ceil(bal * 0.03 / 100) * 100), updated: new Date().toISOString() });
+    persist('settings'); renderProfile();
+  }
+  else if (a === 'pf-use') { const el = $('#' + t.dataset.f); if (el) { el.value = toInputMoney(+t.dataset.v); pfPreview(); } }
+}
+function profileSummary() {
+  const pf = S.settings.profile; if (!pf) return '';
+  return `Paie ${money0(pf.pay)} ${PAY_FREQ[pf.freq][0].toLowerCase()}${pf.variable ? ' (variable)' : ''} · fixes ${money0(pfFixed(pf))} · épargne ${money0(pf.save)}${pf.debt ? ' · dettes ' + money0(pf.debt) : ''} · dépenses courantes ${money0(pfSpend(pf))}`;
+}
+// Dashboard: snapshot of accounts and cards, with net worth.
+function accountsCard() {
+  const s = S.settings; if (!s.accounts.length) return '';
+  const assets = s.accounts.reduce((a, x) => a + x.bal, 0), debt = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
+  const upd = [...s.accounts.map(a => a.updated), ...s.debts.map(d => (d.updated || '').slice(0, 10))].filter(Boolean).sort().pop();
+  return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Mes comptes</h2><button class="link" data-act="pf-open" data-step="2">Mettre à jour</button></div>
+    ${s.accounts.map(a => `<div class="dline"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span></div>`).join('')}
+    ${debt ? `<div class="dline"><span>Cartes et dettes</span><span class="num">−${money0(debt)}</span></div>` : ''}
+    <div class="dline" style="font-weight:800"><span>Valeur nette</span><span class="num">${money0(assets - debt)}</span></div>
+    ${upd ? `<div class="note">Soldes du ${esc(shortDate(upd, true))}.</div>` : ''}</div>`;
+}
+
 /* ---------- Goals view ---------- */
 function renderGoals() {
   const s = S.settings, per = activePeriod(), rs = per ? reserveFor(per) : null;
   let body = `<div class="view-head"><h1>Objectifs</h1><button class="btn" data-act="goal-new">Ajouter</button></div>`;
-  body += `<div class="card hero">${rs ? `<div class="kv">
+  const pf = s.profile;
+  if (pf) {
+    const need = goalsNeedPerPay(pf.freq), ok = pf.save >= need;
+    body += `<div class="card hero"><div class="kv">
+      <div><span class="k">Épargne / paie</span><span class="v num">${money0(pf.save)}</span></div>
+      <div><span class="k">Requis / paie</span><span class="v num">${money0(need)}</span></div>
+      <div><span class="k">Écart</span><span class="v num">${money0(pf.save - need)}</span></div></div>
+      <div class="note">${!s.goals.length ? 'Ton épargne n\'a pas encore d\'objectif.' : ok ? 'Ton épargne prévue couvre tes objectifs à leurs dates.' : 'Ton épargne prévue ne suffit pas pour tes dates : augmente-la dans ton profil ou repousse une échéance.'} L'épargne sort de ta paie, pas de ton seuil.</div>
+      <button class="link" data-act="pf-open" data-step="3" style="text-align:left;padding:0">Modifier la répartition ›</button></div>`;
+  } else body += `<div class="card hero">${rs ? `<div class="kv">
       <div><span class="k">Seuil</span><span class="v num">${money0(per.amount)}</span></div>
       <div><span class="k">Épargne</span><span class="v num">${money0(rs.save)}</span></div>
       <div><span class="k">Libre</span><span class="v num">${money0(per.amount - rs.total)}</span></div></div>
@@ -1199,7 +1410,7 @@ function renderGoals() {
       <span class="l1"><span class="name">${esc(g.name)}${g.ex ? '<span class="tag ex">ex.</span>' : ''}</span><span class="bal num">${p} %</span></span>
       <span class="l2"><span class="mono">${money0(g.saved)} sur ${money0(g.target)}</span><span>${over ? 'Échéance passée' : 'd\'ici le ' + esc(shortDate(g.by, true))}</span></span>
       <span class="meter" aria-hidden="true"><i style="width:${Math.max(3, p)}%"></i></span>
-      ${rs && a ? `<span class="l2"><span>${money0(a)} réservés cette période</span></span>` : ''}</button></li>`;
+      ${rs && a ? `<span class="l2"><span>${money0(a)} ${pf ? 'à verser' : 'réservés'} cette période</span></span>` : ''}</button></li>`;
   }).join('')}</ul>`;
   $('#v-goals').innerHTML = body;
 }
@@ -1576,6 +1787,8 @@ function renderSettings() {
   const hasEx = allItems().some(i => i.ex) || s.debts.some(d => d.ex) || s.wishes.some(w => w.ex) || s.goals.some(g => g.ex);
   $('#v-settings').innerHTML = `
     <div class="view-head"><h1>Réglages</h1></div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Mon profil</h2><button class="btn ghost" data-act="pf-open">${s.profile ? 'Modifier' : 'Configurer'}</button></div>
+      <div class="note">${s.profile ? esc(profileSummary()) : 'Ta paie, tes charges fixes, tes comptes et ta répartition. Expy en tire ton seuil de dépenses, de paie en paie.'}</div></div>
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Périodes et seuils</h2><button class="btn ghost" data-act="period-new">Ajouter</button></div>
       <div class="note">Choisis le début et la fin de chaque période (ex. d'une paie à l'autre). Quand une période se termine, la suivante est créée avec la même durée et le même seuil. Les stats restent calculées par mois civil.</div>
       ${thRows}${periods.length > 12 ? `<div class="note">${periods.length - 12} périodes plus anciennes.</div>` : ''}</div>
@@ -1605,7 +1818,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.9.0</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.10.0</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -2037,6 +2250,7 @@ document.addEventListener('click', (e) => {
   if (e.target === $('#sheet')) { closeSheet(); return; }
   if (!t) return;
   const a = t.dataset.act;
+  if (a.startsWith('pf-')) { profileAct(a, t); return; }
   switch (a) {
     case 'add': pressAdd(t); break;
     case 'pick-cat': UI.cat = t.dataset.cat; UI.catPicked = true; if (!UI.homePicked) UI.home = !!catById(UI.cat).home; renderChips(); renderHomeToggle(); break;
@@ -2101,10 +2315,17 @@ document.addEventListener('click', (e) => {
 document.addEventListener('input', (e) => {
   if (e.target.id === 'amtIn') { onNativeInput(e.target); return; }
   if (e.target.id === 'budgetIn') { const v = parseMoney(e.target.value); if (v != null && !isNaN(v)) previewBudget(v); }
+  if (e.target.id === 'pfSave' || e.target.id === 'pfDebt') pfPreview();
 });
 document.addEventListener('change', (e) => {
   const el = e.target, f = el.dataset && el.dataset.field, s = S.settings;
   if (el.id === 'budgetIn') { const v = parseMoney(el.value); if (v != null && !isNaN(v)) { s.debtBudget = v; persist('settings'); } renderDebts(); return; }
+  if (el.id === 'pfFreq' || el.id === 'pfVar') { pfRead(); renderProfile(); return; }
+  if (el.dataset && (el.dataset.pfacc || el.dataset.pfdebt)) {
+    const v = parseMoney(el.value), x = el.dataset.pfacc ? s.accounts.find(a => a.id === el.dataset.pfacc) : s.debts.find(d => d.id === el.dataset.pfdebt);
+    if (x && v != null && !isNaN(v)) { x.bal = el.dataset.pfdebt ? Math.max(0, v) : v; if (el.dataset.pfacc) x.updated = todayISO(); else x.updated = new Date().toISOString(); persist('settings'); }
+    return;
+  }
   if (el.id === 'leftoverToggle') { s.leftoverToDebt = el.checked; persist('settings'); renderDebts(); return; }
   if (el.id === 'dDebtOn') { s.debtReserve = el.checked; if (el.checked) s.debtSince = todayISO(); persist('settings'); rerender(); return; }
   if (el.id === 'dDebtBy') { s.debtGoalBy = el.value && el.value > todayISO() ? el.value : null; persist('settings'); rerender(); return; }
@@ -2142,10 +2363,11 @@ applyTheme();
 resetEntry();
 const HASH_TABS = { '#tableau': 'dash', '#objectifs': 'goals', '#dettes': 'debts', '#souhaits': 'wishes', '#stats': 'stats', '#reglages': 'settings' };
 showTab(HASH_TABS[location.hash] || 'home');
+if (!S.settings.profile && !S.settings.profileSkip && !allItems().length && !S.settings.periods.length && !S.settings.debts.length) openProfile(0);
 window.addEventListener('hashchange', () => { if (HASH_TABS[location.hash]) showTab(HASH_TABS[location.hash]); });
 connect().then(() => { resetEntry(); rerender(); });
 
-window.__budget = { renderDash, renderGoals, reserveFor, startNative, endNative, homeState, simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
+window.__budget = { payPeriodAt, saveReco, renderDash, renderGoals, reserveFor, startNative, endNative, homeState, simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
 })();
 </script>
 </body>

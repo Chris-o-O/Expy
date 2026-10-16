@@ -26,7 +26,11 @@ Tableau de bord · Saisie (écran de lancement) · Dettes · Objectifs · Souhai
 - Seuil par période `{start,end,amount}`, renouvelée automatiquement ; stats par mois civil ; seuils de catégorie mensuels (mois civil).
 - Réserve (`reserveFor(p)`) : part du seuil mise de côté pour les dettes (case « Prendre ce budget dans mon seuil » → budget mensuel de remboursement au prorata) et les objectifs d'épargne = restant × durée de la période ÷ jours jusqu'à l'échéance. Libre = seuil − réserve.
 - Dettes et objectifs sont séparés : tout ce qui touche les dettes (budget, date « libre d'ici » → `debtNeedFor()` donne le budget nécessaire, intérêts compris) vit dans l'onglet Dettes ; Objectifs = épargne seulement.
-- Feuille de route : v1.10 parcours « Mon profil » (paie, charges fixes, répartition, soldes de comptes en photo ; seuil auto modifiable ; proposé au 1er lancement + Réglages), v1.11 indice de confiance par objectif basé sur les dépenses réelles.
+- Profil (`settings.profile`, v1.10) : paie nette (variable → montant prudent), fréquence (`PAY_FREQ`), charges fixes (versement au compte commun par paie, liste $/mois, ou aucune), épargne et dettes par paie. Dépenses courantes = paie − fixes − épargne − dettes → seuil des périodes `auto`, alignées sur les paies (`payPeriodAt`). Seuil modifiable à la main ; la période suivante reprend le montant de la précédente. Avec un profil : budget de remboursement = part dettes, hors seuil ; les objectifs sont financés par la part épargne (pas retirés du seuil).
+- Repère d'épargne (`saveReco`) : 10 % (<30 ans), 15 % (30-44), 20 % (45-54), 25 % (55+) ; −5 pts sous 40 000 $ net/an, +5 au-dessus de 90 000 $ ; min 5 % ; relevé si les objectifs demandent plus. C'est un repère, pas un conseil.
+- Comptes (`settings.accounts`) : photo des soldes (chèque/épargne), valeur nette au tableau de bord. Pas de suivi des virements.
+- Profil proposé au 1er lancement (« Passer »), bandeau pour les utilisateurs existants (« Plus tard » → `profileSkip`), refaisable dans Réglages.
+- Feuille de route : v1.11 indice de confiance par objectif basé sur les dépenses réelles (et la paie variable).
 - Dettes : intérêts mensuels = solde × taux / 12 ; minimums puis surplus à la dette prioritaire (avalanche = taux le plus élevé, boule de neige = plus petit solde).
 - Le reste sous le seuil (après réserve) alimente les dettes (option) puis les souhaits.
 
