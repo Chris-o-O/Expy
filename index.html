@@ -758,8 +758,20 @@ function persist() {
 }
 const mKey = (mk) => 'm-' + mk;
 
+/* Android app (Capacitor, v1.22): the same code runs inside the APK. What a WebView cannot do
+   (download files, the share sheet, vibrations) goes through Capacitor's native plugins. */
+const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const NP = NATIVE ? Object.fromEntries(['Filesystem', 'Share', 'Haptics', 'App'].map(n => [n, window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin(n) : window.Capacitor.Plugins[n]])) : null;
 // File export: a normal browser download (or the share sheet when the browser offers it for files).
-S.dl = {
+// In the app: the file is written to the cache and handed to Android's share sheet (Drive, Files…).
+S.dl = NATIVE ? {
+  async save({ filename, data }) {
+    const r = await NP.Filesystem.writeFile({ path: filename, data, directory: 'CACHE', encoding: 'utf8' });
+    try { await NP.Share.share({ title: filename, files: [r.uri] }); }
+    catch (e) { if (/cancel/i.test(String(e && (e.message || e)))) throw { code: 'declined' }; throw e; }
+    return { status: 'saved' };
+  }
+} : {
   async save({ filename, data }) {
     const type = filename.endsWith('.csv') ? 'text/csv' : 'application/json';
     const blob = new Blob([data], { type });
@@ -795,7 +807,7 @@ function applyUpdate() {
   w.postMessage({ type: 'SKIP_WAITING' });
   setTimeout(() => location.reload(), 3000); // fallback if the switch event never arrives
 }
-if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+if (!NATIVE && 'serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', async () => {
     try {
       swReg = await navigator.serviceWorker.register('sw.js');
@@ -1159,8 +1171,9 @@ const motionOK = () => fxOn() && !(window.matchMedia && matchMedia('(prefers-red
 // Short pulses (< 15 ms) are not felt on many Android motors; the setting scales them.
 const HAPTIC = { tile: 8, press: 12, hit: 22 }, HAPTIC_X = { 1: 1, 2: 2, 3: 3.5 };
 function buzz(kind) {
-  if (!fxOn() || !navigator.vibrate) return false;
+  if (!fxOn() || !(NATIVE || navigator.vibrate)) return false;
   const ms = typeof kind === 'string' ? Math.round(HAPTIC[kind] * HAPTIC_X[S.settings.haptic || 2]) : kind;
+  if (NATIVE) { (Array.isArray(ms) ? ms.filter((_, i) => i % 2 === 0) : [ms]).forEach((d, i) => setTimeout(() => NP.Haptics.vibrate({ duration: d }).catch(() => { }), i * 160)); return true; }
   try { return navigator.vibrate(ms); } catch (e) { return false; }
 }
 const easeOutCubic = (k) => 1 - (1 - k) ** 3;
@@ -2259,7 +2272,8 @@ function renderSettings() {
       ${hasEx ? '<button class="btn danger" data-act="clear-demo">Effacer les données d\'exemple</button>' : ''}
     </div>`,
     app: `    <div class="card"><h2>Écran d'accueil</h2>
-      ${isStandalone() ? '<div class="note">L\'app est installée. L\'icône ouvre directement la saisie, même hors ligne.</div>'
+      ${NATIVE ? '<div class="note">Tu utilises l\'app Android Expy. Tes données restent dans l\'app, sur ce téléphone.</div><a class="btn ghost block" href="https://github.com/Chris-o-O/Expy/releases/latest" target="_blank" rel="noopener">Dernière version (APK)</a>'
+        : isStandalone() ? '<div class="note">L\'app est installée. L\'icône ouvre directement la saisie, même hors ligne.</div>'
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>`,
@@ -2274,7 +2288,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.21.0</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.22.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -2302,6 +2316,7 @@ function sheetPerson() {
   });
 }
 async function sendText(title, text) {
+  if (NATIVE) { try { await NP.Share.share({ title, text, dialogTitle: title }); } catch (e) { } return; }
   try { if (navigator.share) { await navigator.share({ title, text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(text); toast('Relevé copié'); } catch (e) { toast('Copie impossible dans cette vue'); }
 }
@@ -2770,11 +2785,12 @@ document.addEventListener('click', (e) => {
     case 'haptic-test': {
       // Diagnostic: one long, unmistakable pulse, bypassing the Effects setting, and what the browser answered.
       let r = 'absent';
-      if (navigator.vibrate) { try { r = navigator.vibrate(400) ? 'accepté' : 'refusé'; } catch (e) { r = 'erreur'; } }
+      if (NATIVE) { NP.Haptics.vibrate({ duration: 400 }).catch(() => { }); r = 'accepté (app)'; }
+      else if (navigator.vibrate) { try { r = navigator.vibrate(400) ? 'accepté' : 'refusé'; } catch (e) { r = 'erreur'; } }
       const act = navigator.userActivation ? (navigator.userActivation.isActive ? 'oui' : 'non') : '?';
       const ua = (navigator.userAgent.match(/(SamsungBrowser|Firefox|EdgA|OPR|Chrome)\/[\d.]+/) || ['inconnu'])[0];
-      $('#hapticDiag').textContent = `Diagnostic : vibrate ${r} · geste ${act} · ${ua} · ${isStandalone() ? 'app installée' : 'onglet'}.`;
-      toast(r === 'accepté' ? 'Vibration de 0,4 s envoyée' : 'Le navigateur bloque la vibration');
+      $('#hapticDiag').textContent = `Diagnostic : vibrate ${r} · geste ${act} · ${ua} · ${NATIVE ? 'app Android' : isStandalone() ? 'app installée' : 'onglet'}.`;
+      toast(r.startsWith('accepté') ? 'Vibration de 0,4 s envoyée' : 'Le navigateur bloque la vibration');
       break;
     }
     case 'fut-mode': UI.futMode = t.dataset.m; renderFuture(); break;
@@ -2896,6 +2912,14 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) rere
 document.addEventListener('pointerdown', (e) => {
   const b = e.target.closest('#addBtn, #addBtn2, .tile'); if (!b || b.disabled) return;
   buzz(b.classList.contains('tile') ? 'tile' : 'press');
+});
+
+// Android back button (app only): close what is open, then go back to Saisie, then leave the app in the background.
+if (NATIVE) NP.App.addListener('backButton', () => {
+  if (!$('#sheet').hidden) closeSheet();
+  else if (nativeOn()) endNative(false);
+  else if (UI.tab !== 'home') showTab('home');
+  else NP.App.minimizeApp();
 });
 
 /* ---------- Boot ---------- */

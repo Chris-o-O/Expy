@@ -1,0 +1,9 @@
+{
+  "appId": "io.github.chrisoo.expy",
+  "appName": "Expy",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#FFFFFF",
+    "adjustMarginsForEdgeToEdge": "force"
+  }
+}

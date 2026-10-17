@@ -4,7 +4,7 @@ PWA Android de budget personnel (propriétaire : Chris, Montréal ; échanges en
 Dépôt : Chris-o-O/Expy, déployé sur GitHub Pages depuis `main`.
 
 ## Décisions de produit (ne pas remettre en cause sans demande)
-- Android seulement, installable (Chrome › Installer l'application), hors ligne.
+- Android seulement, hors ligne. Deux formes du même code : **app Android** (Capacitor, APK installé directement, pas de Play Store — choix de Chris, v1.22) et PWA (GitHub Pages) pendant la transition.
 - Aucune synchronisation, aucun compte, aucun serveur. Les données restent sur le téléphone ; export CSV / sauvegarde JSON restaurable.
 - Saisie manuelle (pas d'OCR). Objectif : ajouter une dépense en ~2 secondes.
 - Clavier : celui de l'appareil par défaut (toucher le cadran) ; le pavé intégré n'apparaît qu'en repli ou si choisi dans Réglages.
@@ -18,6 +18,15 @@ Dépôt : Chris-o-O/Expy, déployé sur GitHub Pages depuis `main`.
 - Dans `settings` : `periods`, `cats`, `debts`, `payments`, `debtBudget`, `wishes`, `goals`, `people`, `settles`, `theme`, `kb`, etc. `normalize()` migre les anciennes données.
 - Une dépense partagée garde `amt` = la part de l'utilisateur (ce qui compte partout) et `split = {pid,total,pct,by}`.
 - `window.__budget` expose des fonctions pour les tests.
+
+## App Android (Capacitor, v1.22)
+- `index.html` reste la seule source. `npm run sync` = `scripts/build-www.mjs` (copie l'app dans `www/` + ajoute `capacitor.js`, seulement dans cette copie) puis `npx cap sync android`. Projet natif dans `android/` (appId `io.github.chrisoo.expy`).
+- Dans le code : `NATIVE` (Capacitor présent) et `NP` (plugins Filesystem, Share, Haptics, App). En app : export = fichier en cache + partage Android ; relevé = partage Android ; vibrations = Haptics ; pas de service worker ; bouton retour Android = ferme la feuille / le clavier, puis revient à Saisie, puis met l'app en arrière-plan.
+- Version : lue dans `sw.js` (`expy-vX.Y.Z`) par `android/app/build.gradle` (versionCode = X×10000 + Y×100 + Z). Donc toujours : changer `VERSION` dans `sw.js` + le numéro affiché dans Réglages.
+- APK : `.github/workflows/android.yml` (au push sur `main` quand `sw.js` change, ou à la main) compile, signe et publie une Release GitHub `vX.Y.Z` avec `expy-X.Y.Z.apk`. Signature : secrets `EXPY_KEYSTORE_B64` (keystore PKCS12 en base64, alias `expy`) et `EXPY_KEYSTORE_PASS`. La clé n'est JAMAIS dans le dépôt ; Chris en garde une copie (sans elle, plus de mise à jour possible sans désinstaller).
+- Icônes Android (mipmap classiques, rondes, adaptatives) et écrans de démarrage générés depuis le SVG de la pièce, fond #2B47D9.
+- Pas de SDK Android dans l'environnement de Claude (téléchargements Google bloqués) : la compilation se vérifie dans GitHub Actions.
+- Prochaine étape prévue : lecture des notifications de paiement (Google Wallet + appli bancaire) via un module natif `NotificationListenerService` → « Dépense détectée : X $ chez Y. Ajouter ? ».
 
 ## Écrans (barre ancrée en bas, v1.15 : maquette « C » choisie par Chris ; icônes seules depuis v1.20, libellés en aria-label)
 Tableau · Dettes · **Saisie** (bouton central surélevé, écran de lancement ; le toucher ouvre directement le clavier de l'appareil) · Objectifs (Épargne et Souhaits réunis, bascule en haut via `goalsSeg`) · Stats. Réglages (v1.18) : la pastille au prénom (`settings.name`, initiales via `avatar()`) en haut du Tableau de bord ouvre l'écran Réglages : colonne de catégories à gauche (`SET_SECS` : Profil, Périodes, Catégories, Apparence, Données, App ; `UI.setSec`), contenu à droite. Le prénom se saisit dans le profil (étape 1) ou dans Réglages › Profil. « Foresight » (`#v-future`, `#avenir`) s'ouvre par le bouton « Foresight » sous le récap « Mes comptes » du Tableau de bord (v1.16 : plus de carte d'aperçu).
