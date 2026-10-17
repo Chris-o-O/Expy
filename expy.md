@@ -19,8 +19,10 @@ Dépôt : Chris-o-O/Expy, déployé sur GitHub Pages depuis `main`.
 - Une dépense partagée garde `amt` = la part de l'utilisateur (ce qui compte partout) et `split = {pid,total,pct,by}`.
 - `window.__budget` expose des fonctions pour les tests.
 
-## Écrans (barre flottante en bas)
-Tableau de bord · Saisie (écran de lancement) · Dettes · Objectifs · Souhaits · Stats · Réglages.
+## Écrans (barre ancrée en bas, v1.15 : maquette « C » choisie par Chris)
+Tableau · Dettes · **Saisie** (bouton central surélevé, écran de lancement) · Objectifs · Plus (menu : Souhaits, Stats, Réglages). « L'avenir » (`#v-future`, `#avenir`) s'ouvre depuis le Tableau de bord (carte « Voir l'avenir »).
+- Saisie : « Faisable à la maison », « Partagé », « Note, date » et le bouton ✓ n'apparaissent que pendant une saisie (classe `#v-home.typing` : clavier ouvert, montant tapé, partage ou options ouverts). Avec le pavé intégré, leur place reste réservée (visibility) pour que les touches ne bougent pas.
+- Tableau de bord : Mes comptes, carte « Voir l'avenir » (valeur nette à 12 mois + fourchette), carte « Partages » (on te doit / tu dois, par personne → relevé).
 
 ## Règles de calcul
 - Seuil par période `{start,end,amount}`, renouvelée automatiquement ; stats par mois civil ; seuils de catégorie mensuels (mois civil).
@@ -40,6 +42,8 @@ Tableau de bord · Saisie (écran de lancement) · Dettes · Objectifs · Souhai
 - Bouton Ajouter : écrasement à l'appui (scale .86), ressort au relâchement (`fabpop`) ; tuiles : écrasement.
 - Après un ajout (`celebrateAdd`) : pièce couleur catégorie de la tuile à la tête de l'anneau, 460 ms ; à l'impact : vibration, rebond de l'anneau (`ringPop`), remplissage `easeOutBack` (dépassement ~8 %) via `UI.ringView`, « Reste » défile. Mode clavier (anneau caché) : la pièce vise la barre, qui rebondit et se remplit via `UI.barView` (classe `.hbar.live` coupe sa transition CSS) ; l'anneau reste figé à sa valeur d'avant et rattrape au retrait du clavier (`ringCatchUp` dans `endNative`). Rien ne bloque la saisie suivante.
 - Anneau ↔ barre (v1.14, `morphDial`) : à l'ouverture du clavier, l'anneau se déroule comme un ruban depuis midi (partie posée droite, boucle restante qui rétrécit en roulant vers la droite) jusqu'à la barre ; inverse à la fermeture, puis `ringCatchUp`. Calque `#morphLayer` dessiné en coordonnées du cadran à chaque image (suit le redimensionnement), classe `.dial.morph` cache l'anneau et la barre réels ; segments partagés via `dialSegs()`. 520 ms, ease-in-out cubique.
+- Projection (`projection()`, v1.15) : 12 mois. Compte de paie (`profile.payAcc`, sinon 1er chèque) += capacité réelle par paie (μ de `confidence()`, sinon paie − fixes − seuil) − épargne − paiements de dettes effectifs (`debtPath`, budget de remboursement, intérêts) ; compte d'épargne (`profile.saveAcc`, sinon 1er épargne ; vide = l'épargne reste dans le compte de paie) += part épargne ; autres comptes constants ; dettes négatives. Fourchette 80 % = ±1,28 σ √(paies) sur le compte de paie et la valeur nette. Écran « L'avenir » : graphique Par compte / Valeur nette (`futureChart`) + tableau +1/+3/+6/+12 mois.
+- Anneau → barre v1.15 : la barre est en HAUT du cadran en mode clavier ; le ruban garde la boucle centrée sur « Saisie » (phase 1, ruban tiré vers la gauche) puis la boucle roule vers la droite (phase 2).
 - Prochaines étapes proposées : seuil franchi (tremblement léger + vibration double), confettis objectif atteint / dette soldée, bilan de fin de période façon « niveau terminé ».
 
 ## Tests
