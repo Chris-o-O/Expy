@@ -36,8 +36,9 @@ Tableau de bord · Saisie (écran de lancement) · Dettes · Objectifs · Souhai
 
 ## Game feel (v1.13)
 - Réglage `settings.fx` (Réglages › Apparence › « Effets : animations et vibrations », classe `body.nofx`). `prefers-reduced-motion` coupe les animations, pas les vibrations.
-- Bouton Ajouter : écrasement à l'appui (scale .86), ressort au relâchement (`fabpop`), vibration 8 ms ; tuiles : écrasement + 5 ms.
-- Après un ajout (`celebrateAdd`) : pièce couleur catégorie de la tuile à la tête de l'anneau (ou à la barre en mode clavier), 460 ms ; à l'impact : vibration 14 ms, petit rebond de l'anneau, remplissage `easeOutBack` (dépassement ~8 %) via `UI.ringView`, « Reste » défile. Rien ne bloque la saisie suivante ; durée totale < 1 s.
+- Vibrations (`buzz(kind)`) : tuile 8 ms, appui 12 ms, impact 22 ms × intensité `settings.haptic` (1 Légères ×1, 2 Moyennes ×2 par défaut, 3 Fortes ×3,5) ; bouton « Tester la vibration ». Sous ~15 ms, beaucoup de moteurs Android ne vibrent pas ; Chrome bloque toute vibration en mode silencieux.
+- Bouton Ajouter : écrasement à l'appui (scale .86), ressort au relâchement (`fabpop`) ; tuiles : écrasement.
+- Après un ajout (`celebrateAdd`) : pièce couleur catégorie de la tuile à la tête de l'anneau, 460 ms ; à l'impact : vibration, rebond de l'anneau (`ringPop`), remplissage `easeOutBack` (dépassement ~8 %) via `UI.ringView`, « Reste » défile. Mode clavier (anneau caché) : la pièce vise la barre, qui rebondit et se remplit via `UI.barView` (classe `.hbar.live` coupe sa transition CSS) ; l'anneau reste figé à sa valeur d'avant et rattrape au retrait du clavier (`ringCatchUp` dans `endNative`). Rien ne bloque la saisie suivante.
 - Prochaines étapes proposées : seuil franchi (tremblement léger + vibration double), confettis objectif atteint / dette soldée, bilan de fin de période façon « niveau terminé ».
 
 ## Tests

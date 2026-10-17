@@ -177,6 +177,7 @@ body.appkeys .nat-add { display: none; }
 .stat .v.tick { display: inline-block; animation: tick .32s cubic-bezier(.3,1.6,.5,1); }
 @keyframes tick { 0% { transform: scale(1); } 35% { transform: scale(1.12); } 100% { transform: scale(1); } }
 body.nofx .fab, body.nofx .keypad .add, body.nofx .tile { transition: none; }
+.hbar.live i, .hbar.live b { transition: none; }
 body.nofx .fab.done, body.nofx .keypad .add.done, body.nofx .stat .v.tick { animation: none; }
 @keyframes fabcheck { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
 body.kb .keypad, body.kb .tabs, body.kb #banners, body.kb .stats3, body.kb .legend, body.kb .homehead, body.kb #recentHead, body.kb #recent { display: none; }
@@ -547,7 +548,7 @@ function defaultSettings() {
     leftoverToDebt: true, reviewed: {},
     alerts: {}, lastExport: null, theme: 'auto',
     people: [], settles: [], lastSplit: null, goals: [], debtReserve: false, debtGoalBy: null, debtSince: null, kb: 'native',
-    profile: null, profileSkip: false, accounts: [], fx: true,
+    profile: null, profileSkip: false, accounts: [], fx: true, haptic: 2,
   };
 }
 const DEFAULT_CATS = [
@@ -649,6 +650,7 @@ function normalize(st) {
   if (s.profile && !Array.isArray(s.profile.fixedItems)) s.profile.fixedItems = [];
   s.profileSkip = !!s.profileSkip;
   s.fx = s.fx !== false;
+  if (![1, 2, 3].includes(s.haptic)) s.haptic = 2;
   s.v = 2;
   return s;
 }
@@ -967,6 +969,7 @@ function endNative(fail) {
   document.body.classList.remove('kb');
   UI.kbOK = false;
   renderAmount();
+  ringCatchUp();
 }
 const nativeOn = () => document.body.classList.contains('kb');
 function renderChips() {
@@ -1038,7 +1041,13 @@ function addExpense() {
 /* ---------- Game feel ---------- */
 const fxOn = () => S.settings.fx !== false;
 const motionOK = () => fxOn() && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-function buzz(p) { if (fxOn() && navigator.vibrate) try { navigator.vibrate(p); } catch (e) { } }
+// Short pulses (< 15 ms) are not felt on many Android motors; the setting scales them.
+const HAPTIC = { tile: 8, press: 12, hit: 22 }, HAPTIC_X = { 1: 1, 2: 2, 3: 3.5 };
+function buzz(kind) {
+  if (!fxOn() || !navigator.vibrate) return false;
+  const ms = typeof kind === 'string' ? Math.round(HAPTIC[kind] * HAPTIC_X[S.settings.haptic || 2]) : kind;
+  try { return navigator.vibrate(ms); } catch (e) { return false; }
+}
 const easeOutCubic = (k) => 1 - (1 - k) ** 3;
 const easeOutBack = (k) => 1 + 2.4 * (k - 1) ** 3 + 1.4 * (k - 1) ** 2; // overshoots ~8 %, settles at 1
 function tween(ms, ease, step, done) {
@@ -1053,12 +1062,16 @@ function dialTarget(spent) {
   const r = $('#ring').getBoundingClientRect(), a = f * 2 * Math.PI - Math.PI / 2, rad = r.width * 100 / 240;
   return A ? { x: r.left + r.width / 2 + rad * Math.cos(a), y: r.top + r.height / 2 + rad * Math.sin(a) } : { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 }
-/* After an add: a coin in the category colour flies from its tile to the ring head, then the ring
-   fills with a small overshoot and "Reste" counts down. The entry is already reset: nothing waits on this. */
+/* After an add: a coin in the category colour flies from its tile to where spending now ends, then
+   the ring (or the bar while the device keyboard is up) fills with a small overshoot and "Reste" counts
+   down. With the keyboard up the hidden ring keeps its old value and catches up when the keyboard closes.
+   The entry is already reset: nothing waits on this. */
 function celebrateAdd(cat, from, prev) {
-  if (!motionOK() || !from || !prev || !UI.hs || !UI.hs.per) { buzz(12); return; }
-  const h = UI.hs, to = dialTarget(h.spent);
-  UI.ringView = prev.spent; renderRing();
+  if (!motionOK() || !from || !prev || !UI.hs || !UI.hs.per) { buzz('hit'); return; }
+  const kb = nativeOn(), h = UI.hs, to = dialTarget(h.spent);
+  if (kb) { UI.barView = prev.spent; if (UI.ringView == null) UI.ringView = prev.spent; }
+  else UI.ringView = prev.spent;
+  renderRing();
   const stL = $('#stLeft'); if (stL) stL.textContent = money0(prev.left);
   const c = document.createElement('span');
   c.className = 'ico coin'; c.style.background = cat.color; c.innerHTML = catIconSvg(cat);
@@ -1070,14 +1083,32 @@ function celebrateAdd(cat, from, prev) {
     { transform: `translate(${to.x}px, ${to.y}px) scale(.45)`, opacity: .9 },
   ], { duration: 460, easing: 'cubic-bezier(.45,0,.55,1)' });
   const land = () => {
-    c.remove(); buzz(14);
+    c.remove(); buzz('hit');
     const s0 = prev.spent, s1 = UI.hs ? UI.hs.spent : s0, l0 = prev.left, l1 = UI.hs ? UI.hs.left : l0;
-    $('#ring').animate({ scale: [1, 1.035, 1] }, { duration: 260, easing: 'ease-out' });
-    tween(520, easeOutBack, (k) => { UI.ringView = s0 + (s1 - s0) * k; renderRing(); }, () => { UI.ringView = null; renderRing(); });
+    if (kb && nativeOn()) {
+      const bar = $('#hbar'); bar.classList.add('live');
+      bar.animate({ scale: ['1 1', '1.02 1.9', '1 1'] }, { duration: 320, easing: 'cubic-bezier(.3,1.6,.5,1)' });
+      tween(520, easeOutBack, (k) => { UI.barView = s0 + (s1 - s0) * k; renderRing(); }, () => { UI.barView = null; bar.classList.remove('live'); renderRing(); });
+    } else {
+      ringPop();
+      tween(520, easeOutBack, (k) => { UI.ringView = s0 + (s1 - s0) * k; renderRing(); }, () => { UI.ringView = null; renderRing(); });
+    }
     const el = $('#stLeft');
     if (el) { el.classList.remove('tick'); void el.offsetWidth; el.classList.add('tick'); tween(480, easeOutCubic, (k) => { el.textContent = money0(l0 + (l1 - l0) * k); }); }
   };
   anim.onfinish = land; anim.oncancel = land;
+}
+const ringPop = () => $('#ring').animate({ scale: [1, 1.06, .985, 1] }, { duration: 380, easing: 'ease-out' });
+// Keyboard closed after adds: the ring catches up from where it was, once it has grown back.
+function ringCatchUp() {
+  const s0 = UI.ringView; if (s0 == null) return;
+  if (!motionOK() || !UI.hs || UI.hs.spent === s0) { UI.ringView = null; renderRing(); return; }
+  renderRing();
+  setTimeout(() => {
+    const s1 = UI.hs ? UI.hs.spent : s0;
+    ringPop(); buzz('press');
+    tween(560, easeOutBack, (k) => { UI.ringView = s0 + (s1 - s0) * k; renderRing(); }, () => { UI.ringView = null; renderRing(); });
+  }, 300);
 }
 
 /* ---------- Home render ---------- */
@@ -1135,7 +1166,7 @@ function renderRing() {
     if (e > 0) {
       const after = h.left - e;
       note = after >= 0 ? `<span style="color:${h.free > 0 && h.spent + e >= .8 * h.free ? 'var(--warn)' : 'var(--ok)'}">→ reste ${money(after)}</span>` : `<span style="color:var(--bad)">→ dépasse de ${money(-after)}</span>`;
-    } else note = `<span class="muted">reste ${money(UI.ringView == null ? h.left : h.left + h.spent - Math.round(UI.ringView))}</span>`;
+    } else note = `<span class="muted">reste ${money((nativeOn() ? UI.barView : UI.ringView) == null ? h.left : h.left + h.spent - Math.round(nativeOn() ? UI.barView : UI.ringView))}</span>`;
     label = `${Math.round(h.spent / A * 100)} % du seuil dépensé${rs.total ? ', ' + Math.round(rs.total / A * 100) + ' % réservé' : ''}`;
   } else {
     note = `<span class="muted">${esc(h.label)} : ${money0(h.spent)}</span>`; label = 'Aucune période définie';
@@ -1143,7 +1174,7 @@ function renderRing() {
   $('#ring').innerHTML = svg; $('#ring').setAttribute('aria-label', label);
   const seg = (id, a, l, c) => { const el = $('#' + id); el.style.left = (a * 100).toFixed(2) + '%'; el.style.width = (Math.max(0, l) * 100).toFixed(2) + '%'; if (c) el.style.background = c; };
   if (h.per) {
-    const A = h.amount, rs = h.rs, fs = Math.min(rs.save / A, 1), fd = Math.min(rs.debt / A, 1 - fs), sp = Math.min((UI.ringView ?? h.spent) / A, 1);
+    const A = h.amount, rs = h.rs, fs = Math.min(rs.save / A, 1), fd = Math.min(rs.debt / A, 1 - fs), sp = Math.min((UI.barView ?? h.spent) / A, 1);
     seg('hb-sp', 0, sp, h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)');
     seg('hb-gh', sp, e > 0 ? Math.min(e / A, 1 - sp) : 0, catById(UI.cat).color);
     seg('hb-de', 1 - fs - fd, fd, 'var(--c-debt)'); seg('hb-sa', 1 - fs, fs, 'var(--c-save)');
@@ -1917,6 +1948,9 @@ function renderSettings() {
       </div>
       <div class="note">Auto suit le réglage de ton téléphone.</div>
       <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="fxToggle" ${s.fx ? 'checked' : ''}>Effets : animations et vibrations</label>
+      ${s.fx ? `<div class="seg three" role="group" aria-label="Vibrations">${[[1, 'Légères'], [2, 'Moyennes'], [3, 'Fortes']].map(([v, l]) => `<button data-act="haptic" data-v="${v}" aria-pressed="${s.haptic === v}">${l}</button>`).join('')}</div>
+      <button class="btn ghost" data-act="haptic-test">Tester la vibration</button>
+      <div class="note">Rien senti ? Chrome coupe les vibrations quand le téléphone est en mode silencieux (le mode vibreur fonctionne). Vérifie aussi Paramètres › Sons et vibrations.</div>` : ''}
       <h2 style="margin-top:6px">Clavier de saisie</h2>
       <div class="seg" role="group" aria-label="Clavier">
         ${[['native', 'Appareil'], ['app', 'Intégré']].map(([v, l]) => `<button data-act="kb-pref" data-v="${v}" aria-pressed="${s.kb === v}">${l}</button>`).join('')}
@@ -1936,7 +1970,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.13.0</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.13.1</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -2406,6 +2440,8 @@ document.addEventListener('click', (e) => {
     case 'person-new': sheetPerson(); break;
     case 'share-open': sheetShare(t.dataset.id); break;
     case 'goals': showTab('goals'); break;
+    case 'haptic': S.settings.haptic = +t.dataset.v; persist('settings'); buzz('hit'); renderSettings(); break;
+    case 'haptic-test': { const ok = buzz([Math.round(HAPTIC.hit * HAPTIC_X[S.settings.haptic]), 90, Math.round(HAPTIC.hit * HAPTIC_X[S.settings.haptic])]); toast(ok ? 'Vibration envoyée (deux impulsions)' : !navigator.vibrate ? 'Ce navigateur ne permet pas les vibrations' : 'Vibration refusée par le navigateur'); break; }
     case 'goal-new': sheetGoal(null); break;
     case 'debt-use-need': S.settings.debtBudget = +t.dataset.v; persist('settings'); toast('Budget de remboursement mis à jour'); rerender(); break;
     case 'goal-edit': sheetGoal(t.dataset.id); break;
@@ -2449,7 +2485,7 @@ document.addEventListener('change', (e) => {
     if (x && v != null && !isNaN(v)) { x.bal = el.dataset.pfdebt ? Math.max(0, v) : v; if (el.dataset.pfacc) x.updated = todayISO(); else x.updated = new Date().toISOString(); persist('settings'); }
     return;
   }
-  if (el.id === 'fxToggle') { s.fx = el.checked; document.body.classList.toggle('nofx', !s.fx); persist('settings'); if (s.fx) buzz(12); return; }
+  if (el.id === 'fxToggle') { s.fx = el.checked; document.body.classList.toggle('nofx', !s.fx); persist('settings'); if (s.fx) buzz('hit'); renderSettings(); return; }
   if (el.id === 'leftoverToggle') { s.leftoverToDebt = el.checked; persist('settings'); renderDebts(); return; }
   if (el.id === 'dDebtOn') { s.debtReserve = el.checked; if (el.checked) s.debtSince = todayISO(); persist('settings'); rerender(); return; }
   if (el.id === 'dDebtBy') { s.debtGoalBy = el.value && el.value > todayISO() ? el.value : null; persist('settings'); rerender(); return; }
@@ -2482,7 +2518,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.
 document.addEventListener('visibilitychange', () => { if (!document.hidden) rerender(); });
 document.addEventListener('pointerdown', (e) => {
   const b = e.target.closest('#addBtn, #addBtn2, .tile'); if (!b || b.disabled) return;
-  buzz(b.classList.contains('tile') ? 5 : 8);
+  buzz(b.classList.contains('tile') ? 'tile' : 'press');
 });
 
 /* ---------- Boot ---------- */
