@@ -45,8 +45,9 @@ jobs:
           KS: ${{ secrets.EXPY_KEYSTORE_B64 }}
         run: |
           if [ -z "$KS" ]; then
-            echo "::error::Secret EXPY_KEYSTORE_B64 manquant (Settings > Secrets and variables > Actions)."
-            exit 1
+            echo "::warning::Secret EXPY_KEYSTORE_B64 manquant : APK compilé sans signature, non publié."
+            echo "NOKEY=1" >> "$GITHUB_ENV"
+            exit 0
           fi
           echo "$KS" | base64 -d > "$RUNNER_TEMP/expy.jks"
           echo "EXPY_KEYSTORE=$RUNNER_TEMP/expy.jks" >> "$GITHUB_ENV"
@@ -58,9 +59,11 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
+          if [ "$NOKEY" = "1" ]; then ls -l app/build/outputs/apk/release/; exit 0; fi
           cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/expy-$V.apk"
 
       - uses: softprops/action-gh-release@v2
+        if: env.NOKEY != '1'
         with:
           tag_name: v${{ env.V }}
           name: Expy ${{ env.V }}
@@ -68,3 +71,9 @@ jobs:
             Expy ${{ env.V }} pour Android. Sur le téléphone : touche le fichier .apk ci-dessous, puis Installer.
           files: expy-${{ env.V }}.apk
           make_latest: true
+
+      - name: Signature manquante
+        if: env.NOKEY == '1'
+        run: |
+          echo "::error::Compilation OK, mais pas de clé de signature : ajoute les secrets EXPY_KEYSTORE_B64 et EXPY_KEYSTORE_PASS puis relance."
+          exit 1
