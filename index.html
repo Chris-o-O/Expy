@@ -1950,7 +1950,7 @@ function renderSettings() {
       <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="fxToggle" ${s.fx ? 'checked' : ''}>Effets : animations et vibrations</label>
       ${s.fx ? `<div class="seg three" role="group" aria-label="Vibrations">${[[1, 'Légères'], [2, 'Moyennes'], [3, 'Fortes']].map(([v, l]) => `<button data-act="haptic" data-v="${v}" aria-pressed="${s.haptic === v}">${l}</button>`).join('')}</div>
       <button class="btn ghost" data-act="haptic-test">Tester la vibration</button>
-      <div class="note">Rien senti ? Chrome coupe les vibrations quand le téléphone est en mode silencieux (le mode vibreur fonctionne). Vérifie aussi Paramètres › Sons et vibrations.</div>
+      <div class="note">Rien senti ? Vérifie Paramètres › Son et vibration › Vibration et retour haptique : l'interrupteur général et les curseurs (retour haptique au toucher, vibration multimédia) ne doivent pas être à zéro. Chrome coupe aussi les vibrations en mode silencieux.</div>
       <div class="note" id="hapticDiag"></div>` : ''}
       <h2 style="margin-top:6px">Clavier de saisie</h2>
       <div class="seg" role="group" aria-label="Clavier">
@@ -1971,7 +1971,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.13.2</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.13.3</p>`;
 }
 
 /* ---------- Sheets ---------- */
