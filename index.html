@@ -212,7 +212,7 @@ body.nofx .fab.done, body.nofx .keypad .add.done, body.nofx .stat .v.tick { anim
 @keyframes fabcheck { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
 #banners { display: flex; flex-direction: column; gap: 8px; }
 #banners:empty { display: none; }
-body.kb .keypad, body.kb .tabs, body.kb #banners, body.kb .stats3, body.kb .legend, body.kb .homehead, body.kb #recentHead, body.kb #recent { display: none; }
+body.kb .keypad, body.kb .tabs, body.kb #banners, body.kb .stats3, body.kb .legend, body.kb .homehead { display: none; }
 body.kb .wrap { padding-bottom: 16px; }
 .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-block: 2px; margin-inline: -16px; padding-inline: 16px; }
 .chips::-webkit-scrollbar { display: none; }
@@ -459,8 +459,6 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
       </div>
       <div class="nat-add" id="natAdd"><button class="fab" id="addBtn2" data-act="add" aria-label="Ajouter la dépense" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>
     </div>
-    <div id="recentHead" style="display:flex;justify-content:space-between;align-items:baseline;padding-top:6px"><h2>Dernières dépenses</h2><button class="link" data-act="tab" data-tab="stats">Tout le mois</button></div>
-    <div id="recent"></div>
   </section>
   <section id="v-dash" class="view" hidden></section>
   <section id="v-future" class="view" hidden></section>
@@ -1308,13 +1306,7 @@ function rowHTML(it) {
     ${it.split ? `<span class="tag share">${esc(personName(it.split.pid))}</span>` : ''}${it.home ? '<span class="tag home">maison</span>' : ''}${it.ex ? '<span class="tag ex">ex.</span>' : ''}
     <span class="amt num">${money(it.amt)}</span></button></li>`;
 }
-function renderRecent() {
-  const items = allItems().sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 5);
-  $('#recent').innerHTML = items.length
-    ? `<ul class="list">${items.map(rowHTML).join('')}</ul>`
-    : `<div class="empty">Aucune dépense pour l'instant. Tape un montant, choisis une catégorie, puis Ajouter.</div>`;
-}
-function renderHome() { renderSummary(); renderBanners(); renderRecent(); renderChips(); renderSplit(); }
+function renderHome() { renderSummary(); renderBanners(); renderChips(); renderSplit(); }
 
 /* ---------- Dashboard ---------- */
 function dashData() {
@@ -2165,7 +2157,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.18.0</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.18.1</p></div>
     </div>`;
 }
 
