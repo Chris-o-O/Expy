@@ -182,9 +182,11 @@ body.appkeys .nat-add { display: none; }
 @keyframes tick { 0% { transform: scale(1); } 35% { transform: scale(1.12); } 100% { transform: scale(1); } }
 body.nofx .fab, body.nofx .keypad .add, body.nofx .tile { transition: none; }
 .hbar.live i, .hbar.live b { transition: none; }
-.fut-card { display: flex; flex-direction: column; gap: 8px; text-align: left; width: 100%; border: 0; font-family: inherit; color: inherit; }
-.fut-card > .k { font-size: 15px; font-weight: 800; }
-.fut-card .kv { grid-template-columns: 1fr 1.3fr; } .fut-card .kv > span { display: flex; flex-direction: column; min-width: 0; }
+.kb-x { display: none; position: absolute; right: 0; top: 24px; z-index: 2; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--fg); align-items: center; justify-content: center; padding: 0; }
+.kb-x svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; }
+body.kb .kb-x { display: flex; }
+.fs-btn { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
+.fs-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .fchart { width: 100%; height: auto; display: block; font-size: 11px; font-weight: 700; fill: var(--muted); font-family: var(--f-ui); }
 .ftab { display: grid; grid-template-columns: minmax(0, 1.25fr) repeat(4, minmax(0, 1fr)); gap: 2px 6px; align-items: start; }
 .ftab .h { font-size: 11.5px; font-weight: 700; color: var(--muted); text-align: right; }
@@ -194,6 +196,8 @@ body.nofx .fab, body.nofx .keypad .add, body.nofx .tile { transition: none; }
 .ftab .b { font-weight: 800; border-top: 1px solid var(--line); }
 body.nofx .fab.done, body.nofx .keypad .add.done, body.nofx .stat .v.tick { animation: none; }
 @keyframes fabcheck { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+#banners { display: flex; flex-direction: column; gap: 8px; }
+#banners:empty { display: none; }
 body.kb .keypad, body.kb .tabs, body.kb #banners, body.kb .stats3, body.kb .legend, body.kb .homehead, body.kb #recentHead, body.kb #recent { display: none; }
 body.kb .wrap { padding-bottom: 16px; }
 .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-block: 2px; margin-inline: -16px; padding-inline: 16px; }
@@ -408,7 +412,7 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 <body>
 <div class="wrap" id="app">
   <section id="v-home" class="view">
-    <div id="banners" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div id="banners"></div>
     <div class="homehead" id="homeHead"></div>
     <div class="dial" id="dial" data-act="native-kb">
       <svg id="ring" viewBox="0 0 240 240" role="img" aria-label="Budget de la période"></svg>
@@ -418,6 +422,7 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
         <div class="amount" id="amount"><input class="big num" id="amtIn" type="text" inputmode="none" readonly autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="0" aria-label="Montant de la dépense"><span class="cur">$</span></div>
         <div class="dial-n" id="dialN" aria-live="polite"></div>
       </div>
+      <button class="kb-x" id="kbClose" data-act="kb-close" type="button" aria-label="Fermer le clavier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       <div class="hbar" id="hbar" aria-hidden="true"><i id="hb-sp"></i><i id="hb-gh"></i><i id="hb-de"></i><i id="hb-sa"></i><b id="hb-pc"></b></div>
     </div>
     <button class="legend" id="legend" data-act="goals" hidden></button>
@@ -464,7 +469,6 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
     <button data-act="tab" data-tab="goals"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6"/></svg></span>Objectifs</button>
     <button data-act="more" id="moreBtn" aria-expanded="false" aria-controls="moreMenu"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/></svg></span>Plus</button>
     <div class="more-menu" id="moreMenu" hidden>
-      <button data-act="tab" data-tab="wishes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/></svg>Souhaits</button>
       <button data-act="tab" data-tab="stats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>Stats</button>
       <button data-act="tab" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Réglages</button>
     </div>
@@ -1347,7 +1351,7 @@ function renderDash() {
     ${o.rows.length > 4 ? `<span class="l2"><span>+ ${o.rows.length - 4} autre${o.rows.length - 4 > 1 ? 's' : ''}</span></span>` : ''}
   </button></li>`;
   const kinds = [['debts', 'Dettes remboursées', 'Dettes'], ['goals', 'Objectifs', 'Objectifs'], ['wishes', 'Souhaits', 'Souhaits']].filter(k => dd[k[0]]);
-  let body = `<div class="view-head"><h1>Tableau de bord</h1></div>` + accountsCard() + (s.profile ? futureCard() : '') + sharesCard();
+  let body = `<div class="view-head"><h1>Tableau de bord</h1></div>` + accountsCard() + sharesCard();
   if (!kinds.length) {
     $('#v-dash').innerHTML = body + `<div class="empty">Ajoute une dette, un objectif ou un souhait pour suivre ici leur progression.</div>
       <div class="btn-row" style="justify-content:center"><button class="btn ghost" data-act="tab" data-tab="debts">Dettes</button><button class="btn ghost" data-act="tab" data-tab="goals">Objectifs</button><button class="btn ghost" data-act="tab" data-tab="wishes">Souhaits</button></div>`;
@@ -1550,7 +1554,8 @@ function accountsCard() {
     ${s.accounts.map(a => `<div class="dline"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span></div>`).join('')}
     ${debt ? `<div class="dline"><span>Cartes et dettes</span><span class="num">−${money0(debt)}</span></div>` : ''}
     <div class="dline" style="font-weight:800"><span>Valeur nette</span><span class="num">${money0(assets - debt)}</span></div>
-    ${upd ? `<div class="note">Soldes du ${esc(shortDate(upd, true))}.</div>` : ''}</div>`;
+    ${upd ? `<div class="note">Soldes du ${esc(shortDate(upd, true))}.</div>` : ''}
+    <button class="btn ghost block fs-btn" data-act="tab" data-tab="future"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Foresight</button></div>`;
 }
 
 /* Confidence: can the real pattern (pay received, spending) fund the goals and the debt-free date?
@@ -1660,14 +1665,6 @@ function futureChart(pj, mode) {
   for (const l of lines) g += `<path d="M${pts(l.v).join('L')}" fill="none" style="stroke:${l.col}" stroke-width="${l.w}" ${l.dash ? 'stroke-dasharray="7 5"' : ''} stroke-linecap="round" stroke-linejoin="round"/><text x="356" y="${(Y(l.v[12]) + 4).toFixed(1)}" style="fill:${l.col}" font-weight="800">${kmoney(l.v[12])}</text>`;
   return `<svg class="fchart" viewBox="0 0 410 256" role="img" aria-label="${mode === 'net' ? 'Valeur nette projetée sur 12 mois' : 'Soldes projetés par compte sur 12 mois'}">${g}</svg>`;
 }
-// Dashboard teaser: one line, the dedicated screen holds the table and the chart.
-function futureCard() {
-  const s = S.settings, pj = projection();
-  if (!pj) return `<button class="card fut-card" data-act="${s.profile ? 'pf-open' : 'pf-open'}" data-step="2"><span class="k">Voir l'avenir</span><span class="note">Ajoute tes comptes dans ton profil pour projeter tes soldes sur 12 mois.</span></button>`;
-  return `<button class="card hero fut-card" data-act="tab" data-tab="future"><span class="k">Voir l'avenir ›</span>
-    <span class="kv"><span><span class="k">Valeur nette dans 12 mois</span><span class="v num">${money0(pj.net[12])}</span></span>
-    <span><span class="k">Probable</span><span class="v num" style="font-size:16px">${money0(pj.net[12] - pj.band[12])} – ${money0(pj.net[12] + pj.band[12])}</span></span></span></button>`;
-}
 // Shared expenses: who owes whom, at the top of the dashboard.
 function sharesCard() {
   const s = S.settings; if (!s.people.length) return '';
@@ -1678,7 +1675,7 @@ function sharesCard() {
 }
 function renderFuture() {
   const s = S.settings, pj = projection(), mode = UI.futMode || 'acc';
-  let body = `<button class="link" data-act="tab" data-tab="dash" style="text-align:left;padding:0">‹ Tableau de bord</button><div class="view-head"><h1>L'avenir</h1></div>`;
+  let body = `<button class="link" data-act="tab" data-tab="dash" style="text-align:left;padding:0">‹ Tableau de bord</button><div class="view-head"><h1>Foresight</h1></div><div class="note" style="margin-top:-6px">Tes comptes dans les 12 prochains mois, selon ta paie et tes vraies dépenses.</div>`;
   if (!pj) { $('#v-future').innerHTML = body + `<div class="empty">Ajoute tes comptes dans ton profil pour voir leur projection.</div><button class="btn" data-act="pf-open" data-step="2">Mes comptes</button>`; return; }
   const cols = [1, 3, 6, 12];
   const rows = [...pj.series.map(x => ({ n: x.name + (x.pay ? ' · paie' : x.name === pj.saveName ? ' · épargne' : ''), v: x.v, band: x.pay })), ...(pj.debt ? [{ n: 'Cartes et dettes', v: pj.debt }] : []), { n: 'Valeur nette', v: pj.net, band: true, b: true }];
@@ -1692,10 +1689,13 @@ function renderFuture() {
   $('#v-future').innerHTML = body;
 }
 
+// Objectifs (épargne) and Souhaits share one tab.
+const goalsSeg = (cur) => `<div class="seg" role="group" aria-label="Objectifs ou souhaits">${[['goals', 'Épargne'], ['wishes', 'Souhaits']].map(([k, l]) => `<button data-act="tab" data-tab="${k}" aria-pressed="${cur === k}">${l}</button>`).join('')}</div>`;
+
 /* ---------- Goals view ---------- */
 function renderGoals() {
   const s = S.settings, per = activePeriod(), rs = per ? reserveFor(per) : null;
-  let body = `<div class="view-head"><h1>Objectifs</h1><button class="btn" data-act="goal-new">Ajouter</button></div>`;
+  let body = goalsSeg('goals') + `<div class="view-head"><h1>Objectifs</h1><button class="btn" data-act="goal-new">Ajouter</button></div>`;
   const pf = s.profile, conf = confidence();
   if (pf) {
     const need = goalsNeedPerPay(pf.freq), ok = pf.save >= need;
@@ -1964,7 +1964,7 @@ function relLabel(iso) {
 }
 function renderWishes() {
   const s = S.settings, { r, rows, hasDebt, debtMonths } = wishPlan();
-  let head = `<div class="view-head"><h1>Souhaits</h1><button class="btn" data-act="wish-new">Ajouter</button></div>`;
+  let head = goalsSeg('wishes') + `<div class="view-head"><h1>Souhaits</h1><button class="btn" data-act="wish-new">Ajouter</button></div>`;
   let rateV, src, warn = '';
   if (r.source === 'fixed') { rateV = `≈ ${money0(r.monthly)}/mois`; src = 'Montant fixe que tu as indiqué.'; }
   else if (r.source === 'auto') {
@@ -2135,7 +2135,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.15.0</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.16.0</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -2550,9 +2550,9 @@ function showTab(tab) {
   if (nativeOn()) endNative(false);
   UI.tab = tab;
   for (const v of ['dash', 'future', 'home', 'goals', 'debts', 'wishes', 'stats', 'settings']) $('#v-' + v).hidden = tab !== v;
-  const nt = tab === 'future' ? 'dash' : tab;
+  const nt = tab === 'future' ? 'dash' : tab === 'wishes' ? 'goals' : tab;
   document.querySelectorAll('.tabs [data-tab]').forEach(b => { if (b.dataset.tab === nt) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-  const inMore = ['wishes', 'stats', 'settings'].includes(tab);
+  const inMore = ['stats', 'settings'].includes(tab);
   if (inMore) $('#moreBtn').setAttribute('aria-current', 'page'); else $('#moreBtn').removeAttribute('aria-current');
   moreMenu(false);
   rerender();
@@ -2585,7 +2585,13 @@ document.addEventListener('click', (e) => {
     case 'pick-cat': UI.cat = t.dataset.cat; UI.catPicked = true; if (!UI.homePicked) UI.home = !!catById(UI.cat).home; renderChips(); renderHomeToggle(); break;
     case 'toggle-home': UI.home = !UI.home; UI.homePicked = true; renderHomeToggle(); break;
     case 'toggle-opts': UI.optsOpen = !UI.optsOpen; $('#opts').hidden = !UI.optsOpen; t.setAttribute('aria-expanded', String(UI.optsOpen)); break;
-    case 'tab': showTab(t.dataset.tab); break;
+    case 'tab': {
+      // The central "+" goes straight to typing with the device keyboard (needs this tap to focus the field).
+      showTab(t.dataset.tab);
+      if (t.dataset.tab === 'home' && t.closest('.tabs') && canKb() && !nativeOn()) startNative();
+      break;
+    }
+    case 'kb-close': endNative(false); break;
     case 'edit-th': { const ap = activePeriod(); sheetPeriod(ap ? ap.id : null); break; }
     case 'period-new': sheetPeriod(null); break;
     case 'wish-new': sheetWish(null); break;
@@ -2693,7 +2699,7 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'amtIn' && !e.target.readOnly) { e.preventDefault(); if (amtCents() > 0) addExpense(); else endNative(false); } });
 // Keep focus in the amount field while tapping tiles / toggle / Add, so the device keyboard stays up.
-document.addEventListener('mousedown', (e) => { if (nativeOn() && e.target.closest('.tile, #homeToggle, #addBtn2, #splitToggle, #splitCtl button')) e.preventDefault(); });
+document.addEventListener('mousedown', (e) => { if (nativeOn() && e.target.closest('.tile, #homeToggle, #addBtn2, #splitToggle, #splitCtl button, #kbClose')) e.preventDefault(); });
 document.addEventListener('focusout', (e) => { if (e.target.id === 'amtIn') setTimeout(() => { const i = $('#amtIn'); if (!i.readOnly && document.activeElement !== i) endNative(false); }, 120); });
 // Keyboard dismissed (e.g. Android back) without a blur: return to the in-app keypad.
 if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (nativeOn() && UI.kbOK && viewH() > UI.kbH0 - 60) endNative(false); });
