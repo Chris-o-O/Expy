@@ -24,6 +24,8 @@ Tableau · Dettes · **Saisie** (bouton central surélevé, écran de lancement 
 - Mode clavier : bouton × (`#kbClose`) en haut à droite du cadran pour fermer le clavier sans passer par le bouton du clavier système (le montant est gardé).
 - Saisie (v1.18.1) : plus de liste « Dernières dépenses » ; elles se consultent et se modifient dans Stats (dépenses du mois).
 - Saisie : « Faisable à la maison », « Partagé », « Note, date » et le bouton ✓ n'apparaissent que pendant une saisie (classe `#v-home.typing` : clavier ouvert, montant tapé, partage ou options ouverts). Avec le pavé intégré, leur place reste réservée (visibility) pour que les touches ne bougent pas.
+- Entrée d'argent (v1.21) : bascule « Entrée d'argent » pendant la saisie (`UI.income`, classe `#v-home.inc` : montant vert, catégories masquées, note « De qui ? »). `settings.incomes` = `{id, amt, ts, note, acc}` : ajoutée au compte de paie et au « Reste » de la période (`homeState().inc`) ; liste et suppression dans Stats.
+- Catégories (v1.21) : pastille au nom sous la tuile choisie (`data-name`, `::after`) ; appui long (280 ms) sur une tuile puis glisser = bulle avec le nom de la tuile sous le doigt + petit tic, relâcher choisit (`tileScrub`, événements tactiles ; un glissement rapide fait toujours défiler).
 - Tableau de bord : Mes comptes (+ bouton Foresight), carte « Partages » (on te doit / tu dois, par personne → relevé).
 
 ## Règles de calcul

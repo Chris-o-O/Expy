@@ -182,6 +182,21 @@ body.appkeys .nat-add { display: none; }
 @keyframes tick { 0% { transform: scale(1); } 35% { transform: scale(1.12); } 100% { transform: scale(1); } }
 body.nofx .fab, body.nofx .keypad .add, body.nofx .tile { transition: none; }
 .hbar.live i, .hbar.live b { transition: none; }
+.opts-row { flex-wrap: wrap; }
+#v-home.inc .tiles, #v-home.inc #homeToggle, #v-home.inc .split-row { display: none; }
+#v-home.inc .amount .big { color: var(--ok); }
+#v-home.inc #addBtn2, #v-home.inc .keypad .add { background: var(--ok); }
+.toggle.inc-t[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); }
+.toggle.inc-t[aria-pressed="true"] .sw { background: var(--ok); }
+/* Selected category: its name in a small pill under the tile (v1.21). */
+.tiles { padding-bottom: 10px; }
+.tile { position: relative; -webkit-touch-callout: none; user-select: none; }
+.tile[aria-pressed="true"]::after { content: attr(data-name); position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); z-index: 2; max-width: 120%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--accent); color: var(--accent-fg); font: 800 10.5px var(--f-ui); padding: 2px 8px; border-radius: 999px; pointer-events: none; }
+/* Long-press a tile and slide: a bubble names the tile under the finger. */
+.tile.hover { transform: scale(1.1); box-shadow: 0 0 0 3px var(--accent); }
+.tile-bubble { position: fixed; z-index: 70; transform: translate(-50%, -100%); display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 999px; background: var(--fg); color: var(--bg); font: 800 16px var(--f-ui); white-space: nowrap; pointer-events: none; box-shadow: 0 10px 26px rgba(0,0,0,.3); }
+.tile-bubble[hidden] { display: none; }
+.tile-bubble .ico { width: 30px; height: 30px; } .tile-bubble .ico svg { width: 18px; height: 18px; }
 .kb-x { display: none; position: absolute; right: 0; top: 24px; z-index: 2; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--fg); align-items: center; justify-content: center; padding: 0; }
 .kb-x svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; }
 body.kb .kb-x { display: flex; }
@@ -443,6 +458,7 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
       <div class="tiles" id="chips" role="group" aria-label="Catégorie"></div>
       <div class="opts-row">
         <button class="toggle" id="homeToggle" data-act="toggle-home" aria-pressed="false"><span class="sw"></span>Faisable à la maison</button>
+        <button class="toggle inc-t" id="incToggle" data-act="toggle-inc" aria-pressed="false"><span class="sw"></span>Entrée d'argent</button>
         <button class="link" id="optsBtn" data-act="toggle-opts" aria-expanded="false">Note, date</button>
       </div>
       <div class="split-row" id="splitRow">
@@ -592,7 +608,7 @@ function defaultSettings() {
     leftoverToDebt: true, reviewed: {},
     alerts: {}, lastExport: null, theme: 'auto',
     people: [], settles: [], lastSplit: null, goals: [], debtReserve: false, debtGoalBy: null, debtSince: null, kb: 'native',
-    profile: null, profileSkip: false, accounts: [], fx: true, haptic: 2, name: '',
+    profile: null, profileSkip: false, accounts: [], fx: true, haptic: 2, name: '', incomes: [],
   };
 }
 const DEFAULT_CATS = [
@@ -696,6 +712,8 @@ function normalize(st) {
   s.fx = s.fx !== false;
   if (![1, 2, 3].includes(s.haptic)) s.haptic = 2;
   s.name = typeof s.name === 'string' ? s.name.trim().slice(0, 24) : '';
+  if (!Array.isArray(s.incomes)) s.incomes = [];
+  s.incomes = s.incomes.filter(i => i && i.id && i.amt > 0 && typeof i.ts === 'string');
   s.v = 2;
   return s;
 }
@@ -923,7 +941,7 @@ function shareRecap(pid) {
   L.push(bal > 0 ? `Total : tu me dois ${money(bal)}` : bal < 0 ? `Total : je te dois ${money(-bal)}` : 'Total : quitte');
   return L.join('\n');
 }
-function entryCost() { const t = amtCents(), sp = UI.split; return sp.on && S.settings.people.some(p => p.id === sp.pid) ? Math.round(t * sp.pct / 100) : t; }
+function entryCost() { if (UI.income) return 0; const t = amtCents(), sp = UI.split; return sp.on && S.settings.people.some(p => p.id === sp.pid) ? Math.round(t * sp.pct / 100) : t; }
 function renderSplit() {
   const s = S.settings, sp = UI.split;
   $('#splitToggle').setAttribute('aria-pressed', String(sp.on));
@@ -954,9 +972,12 @@ function renderAmount() {
   $('#amount').dataset.l = txt.length > 8 ? 'xl' : txt.length > 5 ? 'l' : '';
   $('#amount').classList.toggle('can-kb', canKb());
   document.body.classList.toggle('appkeys', !canKb());
-  $('#dialK').innerHTML = 'Saisie' + (canKb() ? KB_SVG : '');
+  $('#dialK').innerHTML = (UI.income ? 'Entrée' : 'Saisie') + (canKb() ? KB_SVG : '');
   const ok = amtCents() > 0; $('#addBtn').disabled = !ok; $('#addBtn2').disabled = !ok;
-  $('#v-home').classList.toggle('typing', nativeOn() || ok || UI.split.on || UI.optsOpen);
+  $('#v-home').classList.toggle('typing', nativeOn() || ok || UI.split.on || UI.optsOpen || !!UI.income);
+  $('#v-home').classList.toggle('inc', !!UI.income);
+  $('#incToggle').setAttribute('aria-pressed', String(!!UI.income));
+  $('#noteIn').placeholder = UI.income ? 'De qui ? (ex. Mamie)' : 'Note (facultatif)';
   renderRing();
 }
 function amtChanged() {
@@ -1025,7 +1046,7 @@ function renderChips() {
   if (!UI.cat || !S.settings.cats.some(c => c.id === UI.cat)) UI.cat = suggestCat(0);
   const keepX = $('#chips').scrollLeft;
   $('#chips').innerHTML = cats.map(c =>
-    `<button class="tile" data-act="pick-cat" data-cat="${esc(c.id)}" aria-label="${esc(c.name)}" title="${esc(c.name)}" aria-pressed="${c.id === UI.cat}"><span class="ico" style="background:${esc(c.color)}">${catIconSvg(c)}</span></button>`).join('');
+    `<button class="tile" data-act="pick-cat" data-cat="${esc(c.id)}" data-name="${esc(c.name)}" aria-label="${esc(c.name)}" title="${esc(c.name)}" aria-pressed="${c.id === UI.cat}"><span class="ico" style="background:${esc(c.color)}">${catIconSvg(c)}</span></button>`).join('');
   // keep the sideways scroll position, and bring the selected tile into view without moving the page
   const box = $('#chips'); box.scrollLeft = keepX;
   const on = box.querySelector('[aria-pressed="true"]');
@@ -1033,17 +1054,38 @@ function renderChips() {
 }
 function renderHomeToggle() { $('#homeToggle').setAttribute('aria-pressed', String(!!UI.home)); }
 function resetEntry(keepKb) {
-  UI.amt = ''; UI.catPicked = false; UI.homePicked = false; UI.cat = suggestCat(0); UI.home = !!catById(UI.cat).home;
+  UI.amt = ''; UI.income = false; UI.catPicked = false; UI.homePicked = false; UI.cat = suggestCat(0); UI.home = !!catById(UI.cat).home;
   $('#noteIn').value = ''; $('#dateIn').value = todayISO();
   if (nativeOn() && !keepKb) endNative(false);
   UI.optsOpen = false; $('#opts').hidden = true; $('#optsBtn').setAttribute('aria-expanded', 'false');
   { const ls = S.settings.lastSplit; UI.split = { on: false, pid: ls ? ls.pid : null, pct: ls ? ls.pct : 50, by: ls ? ls.by : 'me' }; }
   renderAmount(); renderChips(); renderHomeToggle(); renderSplit();
 }
+// Money in (a gift, a refund): goes to the pay account and adds to what is left in the period.
+function addIncome() {
+  const amt = amtCents(); if (amt <= 0) return;
+  const s = S.settings, ds = $('#dateIn').value;
+  let ts = new Date().toISOString();
+  if (ds && ds !== todayISO()) { const [y, m, d] = ds.split('-').map(Number); ts = new Date(y, m - 1, d, 12, 0).toISOString(); }
+  const acc = (s.profile && s.accounts.find(a => a.id === s.profile.payAcc)) || s.accounts.find(a => a.kind === 'cheque') || s.accounts[0];
+  const inc = { id: 'n' + uid(), amt, ts, note: $('#noteIn').value.trim(), acc: acc ? acc.id : null };
+  s.incomes.push(inc); if (acc) acc.bal += amt; persist('settings');
+  const l0 = UI.hs && UI.hs.per ? UI.hs.left : null;
+  resetEntry(nativeOn()); renderHome(); buzz('hit');
+  const el = $('#stLeft');
+  if (el && l0 != null && motionOK()) { const l1 = UI.hs.left; el.classList.remove('tick'); void el.offsetWidth; el.classList.add('tick'); tween(480, easeOutCubic, (k) => { el.textContent = money0(l0 + (l1 - l0) * k); }); ringPop(); }
+  toast(`+${money(amt)}${inc.note ? ' · ' + inc.note : ''}${acc ? ' dans ' + acc.name : ''}`, () => removeIncome(inc.id));
+}
+function removeIncome(id, ask) {
+  const s = S.settings, inc = s.incomes.find(x => x.id === id); if (!inc) return;
+  const a = s.accounts.find(x => x.id === inc.acc); if (a) a.bal -= inc.amt;
+  s.incomes = s.incomes.filter(x => x.id !== id); persist('settings'); rerender();
+  if (ask) toast('Entrée supprimée', () => { s.incomes.push(inc); if (a) a.bal += inc.amt; persist('settings'); rerender(); });
+}
 function pressAdd(btn) {
   if (UI.adding || amtCents() <= 0) return;
   UI.adding = true; btn.classList.add('done');
-  setTimeout(() => { btn.classList.remove('done'); UI.adding = false; addExpense(); }, 240);
+  setTimeout(() => { btn.classList.remove('done'); UI.adding = false; if (UI.income) addIncome(); else addExpense(); }, 240);
 }
 function addExpense() {
   const total = amtCents();
@@ -1241,7 +1283,9 @@ function homeState() {
   if (!per) return { per: null, spent, homeC, label: cap(monthLabel(mk)) };
   const len = periodLen(per), elapsed = daysBetween(per.start, today) + 1, daysLeft = len - elapsed + 1;
   const rs = reserveFor(per), free = per.amount - rs.total;
-  return { per, spent, homeC, len, elapsed, daysLeft, rs, free, left: free - spent, amount: per.amount, label: rangeLabel(per) };
+  // Money received during the period (a gift, a refund) adds to what is left to spend.
+  const inc = S.settings.incomes.filter(i => { const d = dayOfItem(i); return d >= per.start && d <= per.end; }).reduce((a, i) => a + i.amt, 0);
+  return { per, spent, homeC, len, elapsed, daysLeft, rs, free, inc, left: free + inc - spent, amount: per.amount, label: rangeLabel(per) };
 }
 function renderSummary() {
   const h = homeState(); UI.hs = h;
@@ -1255,6 +1299,7 @@ function renderSummary() {
     lg.innerHTML = `<span>${dot('var(--fg)')}Dépensé ${money0(h.spent)}</span>`
       + (rs.debt ? `<span>${dot('var(--c-debt)')}Dettes ${money0(rs.debt)}</span>` : '')
       + (rs.save ? `<span>${dot('var(--c-save)')}Épargne ${money0(rs.save)}</span>` : '')
+      + (h.inc ? `<span style="color:var(--ok)">+${money0(h.inc)} reçus</span>` : '')
       + `<span class="lk" aria-label="Objectifs">›</span>`;
     const col = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--ok)';
     const perDay = h.left > 0 && h.daysLeft > 0 ? money0(h.left / h.daysLeft) : '—';
@@ -1284,7 +1329,8 @@ function renderRing() {
       const ang = ((h.free * (h.elapsed - 0.5) / h.len) / A) * 2 * Math.PI - Math.PI / 2, cx = Math.cos(ang), cy = Math.sin(ang);
       svg += `<line x1="${(120 + 87 * cx).toFixed(1)}" y1="${(120 + 87 * cy).toFixed(1)}" x2="${(120 + 113 * cx).toFixed(1)}" y2="${(120 + 113 * cy).toFixed(1)}" stroke-width="4" stroke-linecap="round" style="stroke:var(--accent)"/>`;
     }
-    if (e > 0) {
+    if (UI.income && amtCents() > 0) note = `<span style="color:var(--ok)">→ reste ${money(h.left + amtCents())}</span>`;
+    else if (e > 0) {
       const after = h.left - e;
       note = after >= 0 ? `<span style="color:${h.free > 0 && h.spent + e >= .8 * h.free ? 'var(--warn)' : 'var(--ok)'}">→ reste ${money(after)}</span>` : `<span style="color:var(--bad)">→ dépasse de ${money(-after)}</span>`;
     } else note = `<span class="muted">reste ${money((nativeOn() ? UI.barView : UI.ringView) == null ? h.left : h.left + h.spent - Math.round(nativeOn() ? UI.barView : UI.ringView))}</span>`;
@@ -1895,6 +1941,7 @@ function renderStats() {
   if (UI.statsMonth > curMonth()) UI.statsMonth = curMonth();
   const mk = UI.statsMonth;
   const items = itemsOf(mk).slice().sort((a, b) => b.ts.localeCompare(a.ts));
+  const incs = S.settings.incomes.filter(i => dayOfItem(i).slice(0, 7) === mk).sort((a, b) => b.ts.localeCompare(a.ts));
   const total = sumC(items), homeC = sumC(items.filter(i => i.home));
   const isCur = mk === curMonth();
   const mFirst = mk + '-01', mLast = isoOf(new Date(parseMonth(mk).getFullYear(), parseMonth(mk).getMonth() + 1, 0));
@@ -1957,7 +2004,9 @@ function renderStats() {
     </div>
     <div class="card"><h2>Par catégorie</h2>${catRows || '<div class="note">Aucune dépense ce mois-ci.</div>'}</div>
     <h2 style="padding-top:4px">Dépenses du mois (${items.length})</h2>
-    ${items.length ? `<ul class="list">${items.map(rowHTML).join('')}</ul>` : '<div class="empty">Aucune dépense.</div>'}`;
+    ${items.length ? `<ul class="list">${items.map(rowHTML).join('')}</ul>` : '<div class="empty">Aucune dépense.</div>'}
+    ${incs.length ? `<h2 style="padding-top:4px">Entrées d'argent (${money0(incs.reduce((a, i) => a + i.amt, 0))})</h2>
+    <ul class="list">${incs.map(i => `<li><div class="row"><span class="main"><span class="t">${esc(i.note || 'Entrée d\'argent')}</span><span class="d">${esc(dateLabel(i.ts))}</span></span><span class="amt num" style="color:var(--ok)">+${money(i.amt)}</span><button class="icon-btn" data-act="inc-del" data-id="${esc(i.id)}" aria-label="Supprimer cette entrée">×</button></div></li>`).join('')}</ul>` : ''}`;
 }
 
 function periodStatus(p) {
@@ -2225,7 +2274,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.20.0</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.21.0</p></div>
     </div>`;
 }
 
@@ -2678,8 +2727,10 @@ document.addEventListener('click', (e) => {
   if (a.startsWith('pf-')) { profileAct(a, t); return; }
   switch (a) {
     case 'add': pressAdd(t); break;
-    case 'pick-cat': UI.cat = t.dataset.cat; UI.catPicked = true; if (!UI.homePicked) UI.home = !!catById(UI.cat).home; renderChips(); renderHomeToggle(); break;
+    case 'pick-cat': if (Date.now() - (UI.scrubbed || 0) < 450) break; UI.cat = t.dataset.cat; UI.catPicked = true; if (!UI.homePicked) UI.home = !!catById(UI.cat).home; renderChips(); renderHomeToggle(); break;
     case 'toggle-home': UI.home = !UI.home; UI.homePicked = true; renderHomeToggle(); break;
+    case 'toggle-inc': UI.income = !UI.income; if (UI.income) { UI.optsOpen = true; $('#opts').hidden = false; $('#optsBtn').setAttribute('aria-expanded', 'true'); } renderAmount(); break;
+    case 'inc-del': removeIncome(t.dataset.id, true); break;
     case 'toggle-opts': UI.optsOpen = !UI.optsOpen; $('#opts').hidden = !UI.optsOpen; t.setAttribute('aria-expanded', String(UI.optsOpen)); break;
     case 'tab': {
       // The central "+" goes straight to typing with the device keyboard (needs this tap to focus the field).
@@ -2804,6 +2855,44 @@ document.addEventListener('focusout', (e) => { if (e.target.id === 'amtIn') setT
 if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (nativeOn() && UI.kbOK && viewH() > UI.kbH0 - 60) endNative(false); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'budgetIn') e.target.blur(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) rerender(); });
+// Long-press a category tile, then slide over the others: a bubble names the tile under the finger
+// (with a light tick on each change); lifting the finger picks it. A quick swipe still scrolls the tiles.
+(function tileScrub() {
+  let timer = null, on = false, cur = null, sx = 0, sy = 0;
+  const bubble = document.createElement('div'); bubble.className = 'tile-bubble'; bubble.hidden = true; document.body.appendChild(bubble);
+  const show = (tile) => {
+    if (tile === cur) return;
+    if (cur) cur.classList.remove('hover');
+    cur = tile;
+    if (!tile) { bubble.hidden = true; return; }
+    tile.classList.add('hover');
+    const c = catById(tile.dataset.cat), r = tile.getBoundingClientRect();
+    bubble.innerHTML = `<span class="ico" style="background:${esc(c.color)}">${catIconSvg(c)}</span>${esc(c.name)}`;
+    bubble.style.left = Math.min(window.innerWidth - 80, Math.max(80, r.left + r.width / 2)) + 'px'; bubble.style.top = (r.top - 10) + 'px';
+    bubble.hidden = false; buzz('tile');
+  };
+  document.addEventListener('touchstart', (e) => {
+    const t = e.target.closest('#chips .tile'); if (!t || e.touches.length > 1) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY; clearTimeout(timer);
+    timer = setTimeout(() => { timer = null; on = true; show(t); }, 280);
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!on) { if (timer && Math.hypot(e.touches[0].clientX - sx, e.touches[0].clientY - sy) > 10) { clearTimeout(timer); timer = null; } return; }
+    e.preventDefault();
+    const p = e.touches[0], el = document.elementFromPoint(p.clientX, p.clientY);
+    show((el && el.closest('#chips .tile')) || cur);
+  }, { passive: false });
+  const end = (e) => {
+    clearTimeout(timer); timer = null;
+    if (!on) return;
+    on = false; const t = cur; show(null); UI.scrubbed = Date.now();
+    if (e.cancelable) e.preventDefault();
+    if (t) { UI.cat = t.dataset.cat; UI.catPicked = true; if (!UI.homePicked) UI.home = !!catById(UI.cat).home; renderChips(); renderHomeToggle(); renderRing(); }
+  };
+  document.addEventListener('touchend', end, { passive: false });
+  document.addEventListener('touchcancel', end);
+  document.addEventListener('contextmenu', (e) => { if (e.target.closest('#chips .tile')) e.preventDefault(); });
+})();
 document.addEventListener('pointerdown', (e) => {
   const b = e.target.closest('#addBtn, #addBtn2, .tile'); if (!b || b.disabled) return;
   buzz(b.classList.contains('tile') ? 'tile' : 'press');
@@ -2820,7 +2909,7 @@ if (!S.settings.profile && !S.settings.profileSkip && !allItems().length && !S.s
 window.addEventListener('hashchange', () => { if (HASH_TABS[location.hash]) showTab(HASH_TABS[location.hash]); });
 connect().then(() => { resetEntry(); rerender(); });
 
-window.__budget = { projection, confidence, sheetReview, payPeriodAt, saveReco, renderDash, renderGoals, reserveFor, startNative, endNative, homeState, simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
+window.__budget = { addIncome, removeIncome, projection, confidence, sheetReview, payPeriodAt, saveReco, renderDash, renderGoals, reserveFor, startNative, endNative, homeState, simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
 })();
 </script>
 </body>
