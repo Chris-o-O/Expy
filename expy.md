@@ -13,7 +13,7 @@ Dépôt : Chris-o-O/Expy, déployé sur GitHub Pages depuis `main`.
 ## Architecture
 - Un seul `index.html` (HTML + CSS + JS vanilla, aucune dépendance). Police : `fonts/bricolage.woff2`.
 - `sw.js` : cache-first, mise à jour en un toucher (`SKIP_WAITING`). **À chaque version : changer `VERSION` dans `sw.js` ET le numéro affiché en bas de Réglages (« Expy · version X »).**
-- `manifest.webmanifest` + `icons/`.
+- `manifest.webmanifest` + `icons/`. Icône (v1.19, piste « A · la pièce qui roule » choisie par Chris) : fond bleu #2B47D9, pièce or #F5A300 qui roule vers la droite en déroulant un ruban noir, traits de vitesse blancs. `icon-192/512` = carré arrondi (rx 22 %), `icon-maskable-512` = plein cadre (dessin dans la zone sûre de 80 %). Les PNG sont générés depuis le SVG (viewBox 100) avec Chromium.
 - Données : localStorage, clé `bex1:data` `{v:2, settings, months}` ; `bex1:theme` (thème, lu avant le rendu). Montants en cents ; dépenses classées par mois `YYYY-MM`.
 - Dans `settings` : `periods`, `cats`, `debts`, `payments`, `debtBudget`, `wishes`, `goals`, `people`, `settles`, `theme`, `kb`, etc. `normalize()` migre les anciennes données.
 - Une dépense partagée garde `amt` = la part de l'utilisateur (ce qui compte partout) et `split = {pid,total,pct,by}`.
