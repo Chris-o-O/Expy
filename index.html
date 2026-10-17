@@ -125,6 +125,10 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .hbar i { position: absolute; top: 0; bottom: 0; transition: left .3s ease, width .3s ease, background-color .2s; }
 .hbar b { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: var(--accent); transition: left .3s ease; }
 body.kb .dial { width: 100%; height: 132px; }
+/* Ring <-> bar morph (v1.14): the real ring and bar hide while an overlay draws the tape unrolling. */
+.morph-layer { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.morph-layer svg { position: absolute; left: 0; top: 0; overflow: visible; }
+.dial.morph > svg, .dial.morph .hbar { visibility: hidden; }
 body.kb .dial > svg { opacity: 0; transform: scale(.35) translateY(-20%); pointer-events: none; }
 body.kb .hbar { opacity: 1; transform: none; }
 body.kb .dial-c { inset: 0 0 24px 0; padding-inline: 0; }
@@ -383,6 +387,7 @@ body.kb .wrap { padding-bottom: 16px; }
     <div class="homehead" id="homeHead"></div>
     <div class="dial" id="dial" data-act="native-kb">
       <svg id="ring" viewBox="0 0 240 240" role="img" aria-label="Budget de la période"></svg>
+      <div class="morph-layer" id="morphLayer" aria-hidden="true"></div>
       <div class="dial-c">
         <div class="dial-k" id="dialK">Saisie</div>
         <div class="amount" id="amount"><input class="big num" id="amtIn" type="text" inputmode="none" readonly autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="0" aria-label="Montant de la dépense"><span class="cur">$</span></div>
@@ -951,6 +956,7 @@ function startNative() {
   inp.blur();
   inp.readOnly = false; inp.setAttribute('inputmode', 'decimal');
   document.body.classList.add('kb');
+  morphDial(true);
   inp.focus();
   const end = inp.value.length; try { inp.setSelectionRange(end, end); } catch (e) {}
   renderAmount();
@@ -966,10 +972,11 @@ function endNative(fail) {
   if (fail) { UI.kbFail = true; toast("Clavier de l'appareil indisponible : pavé intégré affiché"); }
   inp.readOnly = true; inp.setAttribute('inputmode', 'none');
   if (document.activeElement === inp) inp.blur();
+  const was = document.body.classList.contains('kb');
   document.body.classList.remove('kb');
   UI.kbOK = false;
   renderAmount();
-  ringCatchUp();
+  if (was) morphDial(false, ringCatchUp); else ringCatchUp();
 }
 const nativeOn = () => document.body.classList.contains('kb');
 function renderChips() {
@@ -1099,16 +1106,51 @@ function celebrateAdd(cat, from, prev) {
   anim.onfinish = land; anim.oncancel = land;
 }
 const ringPop = () => $('#ring').animate({ scale: [1, 1.06, .985, 1] }, { duration: 380, easing: 'ease-out' });
-// Keyboard closed after adds: the ring catches up from where it was, once it has grown back.
+// Keyboard closed after adds: the ring catches up from where it was (called once it is back).
 function ringCatchUp() {
   const s0 = UI.ringView; if (s0 == null) return;
   if (!motionOK() || !UI.hs || UI.hs.spent === s0) { UI.ringView = null; renderRing(); return; }
-  renderRing();
-  setTimeout(() => {
-    const s1 = UI.hs ? UI.hs.spent : s0;
-    ringPop(); buzz('press');
-    tween(560, easeOutBack, (k) => { UI.ringView = s0 + (s1 - s0) * k; renderRing(); }, () => { UI.ringView = null; renderRing(); });
-  }, 300);
+  const s1 = UI.hs.spent;
+  ringPop(); buzz('press');
+  tween(560, easeOutBack, (k) => { UI.ringView = s0 + (s1 - s0) * k; renderRing(); }, () => { UI.ringView = null; renderRing(); });
+}
+// Coloured segments along the track (fractions 0-1), as drawn by the ring and the bar.
+function dialSegs(view) {
+  const h = UI.hs; if (!h || !h.per) return [];
+  const A = h.amount, rs = h.rs, e = entryCost();
+  const fs = Math.min(rs.save / A, 1), fd = Math.min(rs.debt / A, 1 - fs), sp = Math.min(view / A, 1);
+  const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)';
+  const out = [[1 - fs, fs, 'var(--c-save)', 'butt'], [1 - fs - fd, fd, 'var(--c-debt)', 'butt'], [0, sp, hot, 'round']];
+  if (e > 0) out.push([sp, Math.min(e / A, 1 - sp), catById(UI.cat).color, 'round']);
+  return out.filter(s => s[1] > 0.0004);
+}
+/* Ring <-> bar morph. The ring unrolls like tape from its start (12 o'clock): the laid part is straight
+   and the rest stays a loop that shrinks as it rolls toward the right, until only the bar is left.
+   Drawn in the dial's own coordinates every frame, so it follows the dial resizing at the same time. */
+function morphDial(toBar, done) {
+  const dial = $('#dial'), layer = $('#morphLayer'), id = (UI.morphId = (UI.morphId || 0) + 1);
+  if (!motionOK() || !UI.hs) { layer.innerHTML = ''; dial.classList.remove('morph'); if (done) done(); return; }
+  dial.classList.add('morph');
+  const view = () => (toBar ? UI.barView : UI.ringView) ?? UI.hs.spent;
+  const ease = (k) => k < .5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
+  const draw = (k) => {
+    const u = ease(toBar ? k : 1 - k), W = dial.clientWidth, H = dial.clientHeight, rs = $('#ring').clientWidth;
+    const r0 = rs * 100 / 240, L0 = 2 * Math.PI * r0, L1 = Math.max(10, W - 14), L = L0 + (L1 - L0) * u;
+    const ax = W / 2 + (7 - W / 2) * u, ay = (rs / 2 - r0) + ((H - 9) - (rs / 2 - r0)) * u;
+    const sw = rs * 20 / 240 + (14 - rs * 20 / 240) * u, rc = (1 - u) * L / (2 * Math.PI), laid = u * L;
+    const pt = (s) => {
+      if (s <= laid || rc < 0.01) return [ax + s, ay];
+      const th = (s - laid) / rc; return [ax + laid + rc * Math.sin(th), ay + rc - rc * Math.cos(th)];
+    };
+    const path = (a, l) => { const n = Math.max(2, Math.ceil(l * L / 3)), p = []; for (let i = 0; i <= n; i++) { const q = pt((a + l * i / n) * L); p.push(q[0].toFixed(1) + ' ' + q[1].toFixed(1)); } return 'M' + p.join('L'); };
+    const line = (a, l, col, cap) => `<path d="${path(a, l)}" fill="none" stroke-width="${sw.toFixed(2)}" stroke-linecap="${cap}" stroke-linejoin="round" style="stroke:${col}"/>`;
+    layer.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${line(0, 1, 'var(--surface-2)', 'round')}${dialSegs(view()).map(s => line(...s)).join('')}</svg>`;
+  };
+  draw(0);
+  tween(520, (k) => k, (k) => { if (UI.morphId === id) draw(k); }, () => {
+    if (UI.morphId !== id) return;
+    layer.innerHTML = ''; dial.classList.remove('morph'); if (done) done();
+  });
 }
 
 /* ---------- Home render ---------- */
@@ -1971,7 +2013,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.13.3</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.14.0</p>`;
 }
 
 /* ---------- Sheets ---------- */
