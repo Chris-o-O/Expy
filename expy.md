@@ -34,6 +34,12 @@ Tableau de bord · Saisie (écran de lancement) · Dettes · Objectifs · Souhai
 - Dettes : intérêts mensuels = solde × taux / 12 ; minimums puis surplus à la dette prioritaire (avalanche = taux le plus élevé, boule de neige = plus petit solde).
 - Le reste sous le seuil (après réserve) alimente les dettes (option) puis les souhaits.
 
+## Game feel (v1.13)
+- Réglage `settings.fx` (Réglages › Apparence › « Effets : animations et vibrations », classe `body.nofx`). `prefers-reduced-motion` coupe les animations, pas les vibrations.
+- Bouton Ajouter : écrasement à l'appui (scale .86), ressort au relâchement (`fabpop`), vibration 8 ms ; tuiles : écrasement + 5 ms.
+- Après un ajout (`celebrateAdd`) : pièce couleur catégorie de la tuile à la tête de l'anneau (ou à la barre en mode clavier), 460 ms ; à l'impact : vibration 14 ms, petit rebond de l'anneau, remplissage `easeOutBack` (dépassement ~8 %) via `UI.ringView`, « Reste » défile. Rien ne bloque la saisie suivante ; durée totale < 1 s.
+- Prochaines étapes proposées : seuil franchi (tremblement léger + vibration double), confettis objectif atteint / dette soldée, bilan de fin de période façon « niveau terminé ».
+
 ## Tests
 Playwright (chromium) contre `python3 -m http.server 8770` dans le dossier ; ouvrir avec `serviceWorkers: 'block'`, viewport 390×844 mobile. Vérifier : aucune erreur console, thèmes clair/sombre, écran ≤ 800 px de haut, clavier simulé en réduisant la fenêtre.
 
