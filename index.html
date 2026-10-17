@@ -42,7 +42,7 @@ body { margin: 0; overscroll-behavior-y: none; }
   --f-ui: "Bricolage Grotesque", "Roboto", "Segoe UI", system-ui, sans-serif;
   --f-num: "Bricolage Grotesque", "Roboto", system-ui, sans-serif;
   --f-mono: "Bricolage Grotesque", "Roboto", system-ui, sans-serif;
-  --nav-h: 70px;
+  --nav-h: 62px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -199,6 +199,8 @@ body.kb .kb-x { display: flex; }
 .set-body { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .set-body .card { padding: 14px; }
 .set-body .cat-edit { grid-template-columns: 26px minmax(0, 1fr) 34px; grid-template-areas: "dot name del" ". lim ." ". home ."; }
+.acc-card { grid-template-columns: 1fr auto auto; align-items: center; } .acc-card .d { grid-column: 1 / 3; } .acc-card .btn { grid-row: 1; grid-column: 3; }
+.btn.sm { padding: 6px 12px; font-size: 13px; min-height: 0; }
 .fs-btn { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
 .fs-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .fchart { width: 100%; height: auto; display: block; font-size: 11px; font-weight: 700; fill: var(--muted); font-family: var(--f-ui); }
@@ -387,14 +389,14 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 
 /* Tab bar: floating pill */
 .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--pill-bg); border-radius: 24px 24px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); box-shadow: 0 -4px 18px rgba(0,0,0,.12); }
-.tabs-in { position: relative; max-width: 520px; margin: 0 auto; height: 66px; box-sizing: border-box; padding: 6px 6px 8px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; }
+.tabs-in { position: relative; max-width: 520px; margin: 0 auto; height: 58px; box-sizing: border-box; padding: 6px 6px 8px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; }
 .tabs button { position: relative; border: 0; background: transparent; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--pill-fg); font-family: var(--f-ui); font-size: 10.5px; font-weight: 700; }
-.tabs .ic { width: 30px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center; }
+.tabs .ic { width: 46px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; }
 .tabs button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .tabs button[aria-current="page"] { color: #FFFFFF; }
 .tabs button[aria-current="page"] .ic { background: rgba(255,255,255,.14); }
 .tabs button.main { color: #FFFFFF; }
-.tabs button.main .ic { width: 60px; height: 60px; border-radius: 50%; margin-top: -32px; background: var(--accent); color: var(--accent-fg); box-shadow: 0 8px 20px rgba(0,0,0,.28); transition: transform .28s cubic-bezier(.3,1.6,.5,1); }
+.tabs button.main .ic { width: 60px; height: 60px; border-radius: 50%; margin-top: -28px; background: var(--accent); color: var(--accent-fg); box-shadow: 0 8px 20px rgba(0,0,0,.28); transition: transform .28s cubic-bezier(.3,1.6,.5,1); }
 .tabs button.main svg { width: 30px; height: 30px; stroke-width: 2.6; }
 .tabs button.main[aria-current="page"] .ic { box-shadow: 0 0 0 4px var(--pill-bg), 0 0 0 6px var(--accent), 0 8px 20px rgba(0,0,0,.28); }
 .tabs button.main:active .ic { transform: scale(.9); transition-duration: .07s; }
@@ -471,11 +473,11 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 
 <nav class="tabs" aria-label="Sections">
   <div class="tabs-in">
-    <button data-act="tab" data-tab="dash"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg></span>Tableau</button>
-    <button data-act="tab" data-tab="debts"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>Dettes</button>
-    <button class="main" data-act="tab" data-tab="home" aria-current="page"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>Saisie</button>
-    <button data-act="tab" data-tab="goals"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6"/></svg></span>Objectifs</button>
-    <button data-act="tab" data-tab="stats"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg></span>Stats</button>
+    <button aria-label="Tableau" data-act="tab" data-tab="dash"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg></span></button>
+    <button aria-label="Dettes" data-act="tab" data-tab="debts"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span></button>
+    <button aria-label="Saisie" class="main" data-act="tab" data-tab="home" aria-current="page"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span></button>
+    <button aria-label="Objectifs" data-act="tab" data-tab="goals"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6"/></svg></span></button>
+    <button aria-label="Stats" data-act="tab" data-tab="stats"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg></span></button>
   </div>
 </nav>
 <div class="toast" id="toast" role="status" hidden></div>
@@ -1058,7 +1060,9 @@ function addExpense() {
   const per = periodFor(dayOfItem(item));
   const isActive = per && per === activePeriod();
   const before = per ? sumC(itemsIn(per)) : 0;
+  tagSource(item);
   (S.months[mk] = S.months[mk] || []).push(item);
+  charge(item, 1);
   persist(mKey(mk));
   const th = per ? per.amount : null;
   const after = before + amt;
@@ -1079,9 +1083,32 @@ function addExpense() {
   renderHome();
   celebrateAdd(cat, from, prev);
   toast(msg, () => {
-    S.months[mk] = itemsOf(mk).filter(i => i.id !== item.id);
+    S.months[mk] = itemsOf(mk).filter(i => i.id !== item.id); charge(item, -1);
     persist(mKey(mk)); renderHome();
   }, kind);
+}
+
+/* ---------- Card / account ledger (v1.20) ----------
+   Expenses go on the card (or bank account) they are paid with: settings.spendFrom (a debt or account id;
+   '' = not tracked; unset = the first card). The item remembers it in it.via, so undo, edit and delete
+   move that balance back. Items dated before the source's last balance update are already in that balance. */
+const localEnd = (iso) => { if (!iso) return ''; if (iso.length > 10) return iso; const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString(); };
+function spendSource() {
+  const s = S.settings;
+  if (typeof s.spendFrom === 'string') return s.spendFrom || null;
+  const c = s.debts.find(d => d.bal > 0 && !d.ex); return c ? c.id : null;
+}
+const srcById = (id) => S.settings.debts.find(x => x.id === id) || S.settings.accounts.find(x => x.id === id) || null;
+const chargeOf = (it) => it.split ? (it.split.by === 'me' ? it.split.total : 0) : it.amt;
+function charge(it, sign) {
+  if (!it || !it.via || it.ex) return;
+  const s = S.settings, amt = chargeOf(it) * sign;
+  const d = s.debts.find(x => x.id === it.via); if (d) { d.bal = Math.max(0, d.bal + amt); persist('settings'); return; }
+  const a = s.accounts.find(x => x.id === it.via); if (a) { a.bal -= amt; persist('settings'); }
+}
+function tagSource(it) {
+  const id = spendSource(), src = id && srcById(id);
+  if (src && !(src.updated && it.ts <= localEnd(src.updated))) it.via = id;
 }
 
 /* ---------- Game feel ---------- */
@@ -1443,6 +1470,7 @@ function pfRead() {
     if (!pf.pay) return 'Indique ta paie nette.';
   }
   if (st === 2 && $('#pfPayAcc')) { pf.payAcc = $('#pfPayAcc').value; pf.saveAcc = $('#pfSaveAcc').value || ''; }
+  if (st === 2 && $('#pfSpend')) { S.settings.spendFrom = $('#pfSpend').value; persist('settings'); }
   if (st === 1) { pf.common = $('#pfCommonOn').checked; if ($('#pfCommon')) pf.fixedCommon = pfVal('pfCommon') || 0; }
   if (st === 3) { pf.save = pfVal('pfSave') || 0; pf.debt = pfVal('pfDebt') || 0; }
   return '';
@@ -1483,6 +1511,8 @@ function renderProfile(err) {
         <input class="field num" style="width:110px" data-pfdebt="${esc(d.id)}" inputmode="decimal" value="${esc(toInputMoney(d.bal))}" aria-label="Solde de ${esc(d.name)}"><span style="width:32px"></span></div>`).join('')}
       <div class="two"><input class="field" id="pfCardName" maxlength="24" placeholder="ex. Visa"><input class="field num" id="pfCardBal" inputmode="decimal" placeholder="Solde $"></div>
       <div class="two"><input class="field num" id="pfCardApr" inputmode="decimal" placeholder="Taux % (ex. 20,99)"><button type="button" class="btn ghost" data-act="pf-card-add">Ajouter</button></div>
+      ${s.debts.some(d => d.bal > 0) || s.accounts.length ? `<label>Mes dépenses sont payées avec<select class="field" id="pfSpend"><option value="">Ne pas suivre</option>${[...s.debts.filter(d => d.bal > 0), ...s.accounts].map(x => `<option value="${esc(x.id)}" ${spendSource() === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
+      <div class="note">Chaque dépense saisie s'ajoute au solde de cette carte (ou se retire de ce compte) : ta valeur nette suit en direct.</div>` : ''}
       <div class="note">Une photo de tes soldes : mets-les à jour quand tu veux. Une carte payée au complet chaque mois n'a pas besoin d'être ajoutée. Le paiement minimum se règle dans l'onglet Dettes.</div>`;
   } else {
     const fx = pfFixed(pf), avail = pf.pay - fx, sr = saveReco(pf), dr = debtReco(pf);
@@ -1542,7 +1572,7 @@ function profileAct(a, t) {
   else if (a === 'pf-acc-add') {
     const name = $('#pfAccName').value.trim(), bal = parseMoney($('#pfAccBal').value);
     if (!name || bal == null || isNaN(bal)) { renderProfile('Indique le nom et le solde du compte.'); return; }
-    s.accounts.push({ id: 'a' + uid(), name, kind: $('#pfAccKind').value, bal, updated: todayISO() }); persist('settings'); renderProfile();
+    s.accounts.push({ id: 'a' + uid(), name, kind: $('#pfAccKind').value, bal, updated: new Date().toISOString() }); persist('settings'); renderProfile();
   }
   else if (a === 'pf-acc-del') { s.accounts = s.accounts.filter(x => x.id !== t.dataset.id); persist('settings'); renderProfile(); }
   else if (a === 'pf-card-add') {
@@ -1557,17 +1587,44 @@ function profileSummary() {
   const pf = S.settings.profile; if (!pf) return '';
   return `Paie ${money0(pf.pay)} ${PAY_FREQ[pf.freq][0].toLowerCase()}${pf.variable ? ' (variable)' : ''} · fixes ${money0(pfFixed(pf))} · épargne ${money0(pf.save)}${pf.debt ? ' · dettes ' + money0(pf.debt) : ''} · dépenses courantes ${money0(pfSpend(pf))}`;
 }
-// Dashboard: snapshot of accounts and cards, with net worth.
+// Dashboard: accounts and each card (expenses already on it), with net worth.
 function accountsCard() {
-  const s = S.settings; if (!s.accounts.length) return '';
-  const assets = s.accounts.reduce((a, x) => a + x.bal, 0), debt = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
-  const upd = [...s.accounts.map(a => a.updated), ...s.debts.map(d => (d.updated || '').slice(0, 10))].filter(Boolean).sort().pop();
+  const s = S.settings; if (!s.accounts.length && !s.debts.some(d => d.bal > 0)) return '';
+  const cards = s.debts.filter(d => d.bal > 0), src = spendSource();
+  const assets = s.accounts.reduce((a, x) => a + x.bal, 0), debt = cards.reduce((a, d) => a + d.bal, 0);
+  const upd = [...s.accounts, ...s.debts].map(x => (x.updated || '').slice(0, 10)).filter(Boolean).sort().pop();
+  const since = (x) => allItems().filter(i => i.via === x.id).reduce((a, i) => a + chargeOf(i), 0);
   return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Mes comptes</h2><button class="link" data-act="pf-open" data-step="2">Mettre à jour</button></div>
     ${s.accounts.map(a => `<div class="dline"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span></div>`).join('')}
-    ${debt ? `<div class="dline"><span>Cartes et dettes</span><span class="num">−${money0(debt)}</span></div>` : ''}
+    ${cards.map(d => { const n = since(d); return `<div class="dline acc-card"><span>${esc(d.name)}${d.id === src ? ' <span class="tag">dépenses</span>' : ''}</span><span class="num">−${money0(d.bal)}</span>
+      ${n ? `<span class="d">dont ${money0(n)} de dépenses saisies depuis le ${esc(shortDate((d.updated || '').slice(0, 10) || todayISO()))}</span>` : ''}
+      <button class="btn ghost sm" data-act="card-pay" data-id="${esc(d.id)}">Payer</button></div>`; }).join('')}
     <div class="dline" style="font-weight:800"><span>Valeur nette</span><span class="num">${money0(assets - debt)}</span></div>
-    ${upd ? `<div class="note">Soldes du ${esc(shortDate(upd, true))}.</div>` : ''}
-    <button class="btn ghost block fs-btn" data-act="tab" data-tab="future"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Foresight</button></div>`;
+    ${upd ? `<div class="note">Soldes confirmés le ${esc(shortDate(upd, true))}${src ? ', plus tes dépenses depuis' : ''}.</div>` : ''}
+    ${s.accounts.length ? `<button class="btn ghost block fs-btn" data-act="tab" data-tab="future"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Foresight</button>` : ''}</div>`;
+}
+// Pay a card from an account: the card goes down, the account goes down, the payment counts as repaid.
+function sheetCardPay(id) {
+  const s = S.settings, d = s.debts.find(x => x.id === id); if (!d) return;
+  const pa = s.profile && s.accounts.find(a => a.id === s.profile.payAcc) || s.accounts.find(a => a.kind === 'cheque') || s.accounts[0];
+  openSheet(`<h1>Payer ${esc(d.name)}</h1>
+    <form class="form" id="cpForm">
+      <div class="two"><label>Montant ($)<input class="field num" id="cpAmt" inputmode="decimal" value="${esc(toInputMoney(d.bal))}"></label>
+      <label>Depuis<select class="field" id="cpFrom">${s.accounts.map(a => `<option value="${esc(a.id)}" ${pa && pa.id === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}<option value="">Autre compte</option></select></label></div>
+      <div class="note">Solde actuel : ${money(d.bal)}. Le montant est retiré du compte choisi et compte comme remboursé.</div>
+      <button class="btn block" type="submit">Payer</button>
+      <button class="btn ghost block" type="button" data-act="close-sheet">Annuler</button>
+    </form>`);
+  $('#cpForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const amt = parseMoney($('#cpAmt').value);
+    if (amt == null || isNaN(amt) || amt <= 0) { $('#cpAmt').focus(); return; }
+    const pay = Math.min(amt, d.bal), a = s.accounts.find(x => x.id === $('#cpFrom').value);
+    d.bal -= pay; if (a) a.bal -= pay;
+    s.payments.push({ id: uid(), debtId: d.id, amt: pay, date: todayISO(), note: 'Paiement de carte' });
+    persist('settings'); closeSheet(); rerender(); buzz('hit');
+    toast(`${money(pay)} payés sur ${d.name}${a ? ' depuis ' + a.name : ''}`);
+  });
 }
 
 /* Confidence: can the real pattern (pay received, spending) fund the goals and the debt-free date?
@@ -2168,7 +2225,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.19.0</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.20.0</p></div>
     </div>`;
 }
 
@@ -2352,8 +2409,8 @@ function sheetItem(id) {
   $('#itDel').addEventListener('click', () => {
     if (UI.confirm !== 'del') { UI.confirm = 'del'; $('#itDel').textContent = 'Confirmer la suppression'; return; }
     const g = findItem(id); if (!g) return closeSheet();
-    S.months[g.mk] = itemsOf(g.mk).filter(i => i.id !== id);
-    persist(mKey(g.mk)); closeSheet(); rerender(); toast('Dépense supprimée', () => { (S.months[g.mk] = S.months[g.mk] || []).push(g.it); persist(mKey(g.mk)); rerender(); });
+    S.months[g.mk] = itemsOf(g.mk).filter(i => i.id !== id); charge(g.it, -1);
+    persist(mKey(g.mk)); closeSheet(); rerender(); toast('Dépense supprimée', () => { (S.months[g.mk] = S.months[g.mk] || []).push(g.it); charge(g.it, 1); persist(mKey(g.mk)); rerender(); });
   });
   $('#itForm').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -2369,8 +2426,8 @@ function sheetItem(id) {
       upd.split = Object.assign({}, g.it.split, { total: amt, pct: pc, by: state.by }); upd.amt = Math.round(amt * pc / 100);
     }
     const nk = monthKey(new Date(ts));
-    S.months[g.mk] = itemsOf(g.mk).filter(i => i.id !== id);
-    (S.months[nk] = S.months[nk] || []).push(upd);
+    S.months[g.mk] = itemsOf(g.mk).filter(i => i.id !== id); charge(g.it, -1);
+    (S.months[nk] = S.months[nk] || []).push(upd); charge(upd, 1);
     persist(mKey(g.mk), mKey(nk)); closeSheet(); rerender();
   });
 }
@@ -2435,6 +2492,10 @@ function sheetReview(pid) {
   const active = s.debts.filter(d => d.bal > 0);
   const prio = debtSim().priority;
   const pd = active.find(d => d.id === prio) || active[0];
+  // Pay deposit: on by default when the pay account was last confirmed before this pay arrived.
+  const pf = s.profile, pa = pf && (s.accounts.find(a => a.id === pf.payAcc) || s.accounts.find(a => a.kind === 'cheque'));
+  const sa = pf && pa && (s.accounts.find(a => a.id === pf.saveAcc && a.id !== pa.id) || (pf.saveAcc === undefined ? s.accounts.find(a => a.kind === 'epargne' && a.id !== pa.id) : null));
+  const dep = pa && !p.deposited ? { pa, sa, on: !pa.updated || pa.updated.slice(0, 10) < p.start } : null;
   openSheet(`<h1>Fin de période</h1>
     <div class="card"><div class="kv">
       <div><span class="k">Dépensé</span><span class="v num">${money0(spent)}</span></div>
@@ -2444,6 +2505,7 @@ function sheetReview(pid) {
     <form class="form" id="rvForm">
       ${s.profile ? `<label>Paie reçue pour cette période ($)<input class="field num" id="rvPay" inputmode="decimal" value="${esc(toInputMoney(p.paid ?? s.profile.pay))}"></label>
       <div class="note">Change-la si ta paie était différente : l'indice de confiance s'en sert.</div>` : ''}
+      ${dep ? `<label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="rvDep" ${dep.on ? 'checked' : ''}>Ajouter la paie à ${esc(dep.pa.name)} (moins charges fixes${dep.sa ? ', épargne vers ' + esc(dep.sa.name) : ''})</label>` : ''}
       ${active.length ? `<div class="note">Indique le solde de chaque dette aujourd'hui, d'après ton relevé ou ton appli bancaire.</div>` : ''}
       ${active.map(d => `<label>${esc(d.name)} · solde avant : ${money(d.bal)}<input class="field num" id="rv-${esc(d.id)}" data-debt="${esc(d.id)}" inputmode="decimal" value="${esc(toInputMoney(d.bal))}"></label>`).join('')}
       ${payC > 0 && pd ? `<button type="button" class="btn ghost" id="rvApply">Déduire ${money0(payC)} de ${esc(pd.name)}${rs.debt ? ' (reste + réserve)' : ''}</button>` : ''}
@@ -2459,6 +2521,11 @@ function sheetReview(pid) {
     let sv = 0;
     const pv = $('#rvPay') ? parseMoney($('#rvPay').value) : null;
     if (pv != null && !isNaN(pv) && pv >= 0) p.paid = pv;
+    if (dep && $('#rvDep') && $('#rvDep').checked) {
+      const got = p.paid ?? pf.pay, sv = dep.sa ? pf.save : 0;
+      dep.pa.bal += got - pfFixed(pf) - sv; if (dep.sa) dep.sa.bal += sv; p.deposited = true;
+      msg = (msg ? msg + ' · ' : '') + `+${money0(got - pfFixed(pf) - sv)} dans ${dep.pa.name}`;
+    }
     const cb = $('#rvSave');
     if (cb && cb.checked) for (const g of rs.goals) { const o = s.goals.find(x => x.id === g.id); if (o) { o.saved = Math.min(o.target, o.saved + g.amt); sv += g.amt; } }
     if (sv) msg = (msg ? msg + ' · ' : '') + `${money0(sv)} versés à l'épargne`;
@@ -2660,6 +2727,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'fut-mode': UI.futMode = t.dataset.m; renderFuture(); break;
+    case 'card-pay': sheetCardPay(t.dataset.id); break;
     case 'set-sec': UI.setSec = t.dataset.s; renderSettings(); window.scrollTo(0, 0); break;
     case 'goal-new': sheetGoal(null); break;
     case 'debt-use-need': S.settings.debtBudget = +t.dataset.v; persist('settings'); toast('Budget de remboursement mis à jour'); rerender(); break;
@@ -2701,7 +2769,7 @@ document.addEventListener('change', (e) => {
   if (el.id === 'pfFreq' || el.id === 'pfVar' || el.id === 'pfCommonOn') { pfRead(); renderProfile(); return; }
   if (el.dataset && (el.dataset.pfacc || el.dataset.pfdebt)) {
     const v = parseMoney(el.value), x = el.dataset.pfacc ? s.accounts.find(a => a.id === el.dataset.pfacc) : s.debts.find(d => d.id === el.dataset.pfdebt);
-    if (x && v != null && !isNaN(v)) { x.bal = el.dataset.pfdebt ? Math.max(0, v) : v; if (el.dataset.pfacc) x.updated = todayISO(); else x.updated = new Date().toISOString(); persist('settings'); }
+    if (x && v != null && !isNaN(v)) { x.bal = el.dataset.pfdebt ? Math.max(0, v) : v; x.updated = new Date().toISOString(); persist('settings'); }
     return;
   }
   if (el.id === 'meName') { s.name = el.value.trim().slice(0, 24); persist('settings'); renderSettings(); return; }
