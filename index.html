@@ -1950,7 +1950,8 @@ function renderSettings() {
       <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="fxToggle" ${s.fx ? 'checked' : ''}>Effets : animations et vibrations</label>
       ${s.fx ? `<div class="seg three" role="group" aria-label="Vibrations">${[[1, 'Légères'], [2, 'Moyennes'], [3, 'Fortes']].map(([v, l]) => `<button data-act="haptic" data-v="${v}" aria-pressed="${s.haptic === v}">${l}</button>`).join('')}</div>
       <button class="btn ghost" data-act="haptic-test">Tester la vibration</button>
-      <div class="note">Rien senti ? Chrome coupe les vibrations quand le téléphone est en mode silencieux (le mode vibreur fonctionne). Vérifie aussi Paramètres › Sons et vibrations.</div>` : ''}
+      <div class="note">Rien senti ? Chrome coupe les vibrations quand le téléphone est en mode silencieux (le mode vibreur fonctionne). Vérifie aussi Paramètres › Sons et vibrations.</div>
+      <div class="note" id="hapticDiag"></div>` : ''}
       <h2 style="margin-top:6px">Clavier de saisie</h2>
       <div class="seg" role="group" aria-label="Clavier">
         ${[['native', 'Appareil'], ['app', 'Intégré']].map(([v, l]) => `<button data-act="kb-pref" data-v="${v}" aria-pressed="${s.kb === v}">${l}</button>`).join('')}
@@ -1970,7 +1971,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.13.1</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.13.2</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -2441,7 +2442,16 @@ document.addEventListener('click', (e) => {
     case 'share-open': sheetShare(t.dataset.id); break;
     case 'goals': showTab('goals'); break;
     case 'haptic': S.settings.haptic = +t.dataset.v; persist('settings'); buzz('hit'); renderSettings(); break;
-    case 'haptic-test': { const ok = buzz([Math.round(HAPTIC.hit * HAPTIC_X[S.settings.haptic]), 90, Math.round(HAPTIC.hit * HAPTIC_X[S.settings.haptic])]); toast(ok ? 'Vibration envoyée (deux impulsions)' : !navigator.vibrate ? 'Ce navigateur ne permet pas les vibrations' : 'Vibration refusée par le navigateur'); break; }
+    case 'haptic-test': {
+      // Diagnostic: one long, unmistakable pulse, bypassing the Effects setting, and what the browser answered.
+      let r = 'absent';
+      if (navigator.vibrate) { try { r = navigator.vibrate(400) ? 'accepté' : 'refusé'; } catch (e) { r = 'erreur'; } }
+      const act = navigator.userActivation ? (navigator.userActivation.isActive ? 'oui' : 'non') : '?';
+      const ua = (navigator.userAgent.match(/(SamsungBrowser|Firefox|EdgA|OPR|Chrome)\/[\d.]+/) || ['inconnu'])[0];
+      $('#hapticDiag').textContent = `Diagnostic : vibrate ${r} · geste ${act} · ${ua} · ${isStandalone() ? 'app installée' : 'onglet'}.`;
+      toast(r === 'accepté' ? 'Vibration de 0,4 s envoyée' : 'Le navigateur bloque la vibration');
+      break;
+    }
     case 'goal-new': sheetGoal(null); break;
     case 'debt-use-need': S.settings.debtBudget = +t.dataset.v; persist('settings'); toast('Budget de remboursement mis à jour'); rerender(); break;
     case 'goal-edit': sheetGoal(t.dataset.id); break;
