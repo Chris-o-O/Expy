@@ -185,6 +185,8 @@ body.nofx .fab, body.nofx .keypad .add, body.nofx .tile { transition: none; }
 .kb-x { display: none; position: absolute; right: 0; top: 24px; z-index: 2; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--fg); align-items: center; justify-content: center; padding: 0; }
 .kb-x svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; }
 body.kb .kb-x { display: flex; }
+.icon-btn.gear { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--surface-2); color: var(--fg); display: flex; align-items: center; justify-content: center; padding: 0; }
+.icon-btn.gear svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; }
 .fs-btn { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
 .fs-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .fchart { width: 100%; height: auto; display: block; font-size: 11px; font-weight: 700; fill: var(--muted); font-family: var(--f-ui); }
@@ -385,10 +387,6 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 .tabs button.main[aria-current="page"] .ic { box-shadow: 0 0 0 4px var(--pill-bg), 0 0 0 6px var(--accent), 0 8px 20px rgba(0,0,0,.28); }
 .tabs button.main:active .ic { transform: scale(.9); transition-duration: .07s; }
 :root[data-theme="dark"] .tabs button.main .ic { color: #0A0A0A; }
-.more-menu { position: absolute; right: 8px; bottom: calc(100% + 10px); min-width: 196px; background: var(--pill-bg); border-radius: 22px; padding: 8px; display: flex; flex-direction: column; box-shadow: 0 14px 34px rgba(0,0,0,.3); }
-.more-menu[hidden] { display: none; }
-.more-menu button { flex-direction: row; gap: 12px; padding: 11px 12px; border-radius: 14px; font-size: 15px; color: #FFFFFF; }
-.more-menu button[aria-current="page"] { background: rgba(255,255,255,.14); }
 
 /* Toast */
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h) + 8px + env(safe-area-inset-bottom, 0px)); z-index: 40; width: min(488px, calc(100% - 32px)); background: var(--fg); color: var(--bg); border-radius: 20px; padding: 12px 14px 12px 18px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
@@ -467,11 +465,7 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
     <button data-act="tab" data-tab="debts"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>Dettes</button>
     <button class="main" data-act="tab" data-tab="home" aria-current="page"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>Saisie</button>
     <button data-act="tab" data-tab="goals"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6"/></svg></span>Objectifs</button>
-    <button data-act="more" id="moreBtn" aria-expanded="false" aria-controls="moreMenu"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/></svg></span>Plus</button>
-    <div class="more-menu" id="moreMenu" hidden>
-      <button data-act="tab" data-tab="stats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>Stats</button>
-      <button data-act="tab" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Réglages</button>
-    </div>
+    <button data-act="tab" data-tab="stats"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg></span>Stats</button>
   </div>
 </nav>
 <div class="toast" id="toast" role="status" hidden></div>
@@ -1351,7 +1345,7 @@ function renderDash() {
     ${o.rows.length > 4 ? `<span class="l2"><span>+ ${o.rows.length - 4} autre${o.rows.length - 4 > 1 ? 's' : ''}</span></span>` : ''}
   </button></li>`;
   const kinds = [['debts', 'Dettes remboursées', 'Dettes'], ['goals', 'Objectifs', 'Objectifs'], ['wishes', 'Souhaits', 'Souhaits']].filter(k => dd[k[0]]);
-  let body = `<div class="view-head"><h1>Tableau de bord</h1></div>` + accountsCard() + sharesCard();
+  let body = `<div class="view-head"><h1>Tableau de bord</h1><button class="icon-btn gear" data-act="tab" data-tab="settings" aria-label="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.2 6.5l2.6 1.5M17.2 16l2.6 1.5M4.2 17.5l2.6-1.5M17.2 8l2.6-1.5"/><circle cx="12" cy="12" r="6.5"/></svg></button></div>` + accountsCard() + sharesCard();
   if (!kinds.length) {
     $('#v-dash').innerHTML = body + `<div class="empty">Ajoute une dette, un objectif ou un souhait pour suivre ici leur progression.</div>
       <div class="btn-row" style="justify-content:center"><button class="btn ghost" data-act="tab" data-tab="debts">Dettes</button><button class="btn ghost" data-act="tab" data-tab="goals">Objectifs</button><button class="btn ghost" data-act="tab" data-tab="wishes">Souhaits</button></div>`;
@@ -2098,6 +2092,7 @@ function renderSettings() {
     + ' Exporte une sauvegarde chaque mois, et avant de changer de téléphone ou de vider les données de Chrome.';
   const hasEx = allItems().some(i => i.ex) || s.debts.some(d => d.ex) || s.wishes.some(w => w.ex) || s.goals.some(g => g.ex);
   $('#v-settings').innerHTML = `
+    <button class="link" data-act="tab" data-tab="dash" style="text-align:left;padding:0">‹ Tableau de bord</button>
     <div class="view-head"><h1>Réglages</h1></div>
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Mon profil</h2><button class="btn ghost" data-act="pf-open">${s.profile ? 'Modifier' : 'Configurer'}</button></div>
       <div class="note">${s.profile ? esc(profileSummary()) : 'Ta paie, tes charges fixes, tes comptes et ta répartition. Expy en tire ton seuil de dépenses, de paie en paie.'}</div></div>
@@ -2135,7 +2130,7 @@ function renderSettings() {
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>
-    <p class="note" style="text-align:center">Expy · version 1.16.0</p>`;
+    <p class="note" style="text-align:center">Expy · version 1.17.0</p>`;
 }
 
 /* ---------- Sheets ---------- */
@@ -2550,11 +2545,9 @@ function showTab(tab) {
   if (nativeOn()) endNative(false);
   UI.tab = tab;
   for (const v of ['dash', 'future', 'home', 'goals', 'debts', 'wishes', 'stats', 'settings']) $('#v-' + v).hidden = tab !== v;
-  const nt = tab === 'future' ? 'dash' : tab === 'wishes' ? 'goals' : tab;
+  const nt = tab === 'future' || tab === 'settings' ? 'dash' : tab === 'wishes' ? 'goals' : tab;
   document.querySelectorAll('.tabs [data-tab]').forEach(b => { if (b.dataset.tab === nt) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-  const inMore = ['stats', 'settings'].includes(tab);
-  if (inMore) $('#moreBtn').setAttribute('aria-current', 'page'); else $('#moreBtn').removeAttribute('aria-current');
-  moreMenu(false);
+
   rerender();
   window.scrollTo(0, 0);
 }
@@ -2569,9 +2562,7 @@ function rerender() {
   else if (UI.tab === 'wishes') renderWishes();
   else renderSettings();
 }
-function moreMenu(open) { $('#moreMenu').hidden = !open; $('#moreBtn').setAttribute('aria-expanded', String(!!open)); }
 document.addEventListener('click', (e) => {
-  if (!$('#moreMenu').hidden && !e.target.closest('#moreMenu, #moreBtn')) moreMenu(false);
   const k = e.target.closest('[data-k]');
   if (k) { key(k.dataset.k); return; }
   const t = e.target.closest('[data-act]');
@@ -2579,7 +2570,6 @@ document.addEventListener('click', (e) => {
   if (!t) return;
   const a = t.dataset.act;
   if (a.startsWith('pf-')) { profileAct(a, t); return; }
-  if (a === 'more') { moreMenu($('#moreMenu').hidden); return; }
   switch (a) {
     case 'add': pressAdd(t); break;
     case 'pick-cat': UI.cat = t.dataset.cat; UI.catPicked = true; if (!UI.homePicked) UI.home = !!catById(UI.cat).home; renderChips(); renderHomeToggle(); break;
