@@ -153,6 +153,11 @@ body.kb .amount .cur { font-size: 7cqw; }
 .legend[hidden] { display: none; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
 .legend .lk { color: var(--accent); }
+.legend .pace-mk { display: inline-block; width: 3px; height: 11px; border-radius: 2px; background: var(--accent); margin-right: 6px; vertical-align: -1px; }
+/* Long-press the dial: a bubble explains the pace tick (v1.23). */
+.pace-bubble { position: fixed; z-index: 70; transform: translate(-50%, -50%); max-width: min(320px, calc(100vw - 32px)); padding: 10px 14px; border-radius: 18px; background: var(--fg); color: var(--bg); font: 700 14px/1.35 var(--f-ui); text-align: center; pointer-events: none; box-shadow: 0 10px 26px rgba(0,0,0,.3); }
+.pace-bubble b { display: block; font-size: 16px; font-weight: 800; }
+.pace-bubble[hidden] { display: none; }
 .stats3 { display: flex; gap: 8px; }
 .stat { flex: 1; min-width: 0; background: var(--surface-2); border-radius: 16px; padding: 7px 12px; border: 0; text-align: left; display: flex; flex-direction: column; }
 .stat .k { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
@@ -1298,7 +1303,9 @@ function homeState() {
   const rs = reserveFor(per), free = per.amount - rs.total;
   // Money received during the period (a gift, a refund) adds to what is left to spend.
   const inc = S.settings.incomes.filter(i => { const d = dayOfItem(i); return d >= per.start && d <= per.end; }).reduce((a, i) => a + i.amt, 0);
-  return { per, spent, homeC, len, elapsed, daysLeft, rs, free, inc, left: free + inc - spent, amount: per.amount, label: rangeLabel(per) };
+  // Pace: where spending would be today if the free budget were spent evenly over the period (the blue tick).
+  const pace = free > 0 ? Math.round(free * (elapsed - 0.5) / len) : null;
+  return { per, spent, homeC, len, elapsed, daysLeft, rs, free, inc, pace, left: free + inc - spent, amount: per.amount, label: rangeLabel(per) };
 }
 function renderSummary() {
   const h = homeState(); UI.hs = h;
@@ -1313,6 +1320,7 @@ function renderSummary() {
       + (rs.debt ? `<span>${dot('var(--c-debt)')}Dettes ${money0(rs.debt)}</span>` : '')
       + (rs.save ? `<span>${dot('var(--c-save)')}Épargne ${money0(rs.save)}</span>` : '')
       + (h.inc ? `<span style="color:var(--ok)">+${money0(h.inc)} reçus</span>` : '')
+      + (h.pace != null ? `<span><b class="pace-mk" aria-hidden="true"></b>Rythme ${money0(h.pace)}</span>` : '')
       + `<span class="lk" aria-label="Objectifs">›</span>`;
     const col = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--ok)';
     const perDay = h.left > 0 && h.daysLeft > 0 ? money0(h.left / h.daysLeft) : '—';
@@ -2288,7 +2296,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.22.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.23.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -2773,7 +2781,7 @@ document.addEventListener('click', (e) => {
     case 'debt-edit': sheetDebt(t.dataset.id); break;
     case 'method': S.settings.method = t.dataset.m; persist('settings'); renderDebts(); break;
     case 'month': UI.statsMonth = addMonths(UI.statsMonth, Number(t.dataset.d)); renderStats(); break;
-    case 'native-kb': startNative(); break;
+    case 'native-kb': if (Date.now() - (UI.paceShown || 0) < 900) break; startNative(); break;
     case 'toggle-split': UI.split.on = !UI.split.on; renderSplit(); if (UI.split.on && !S.settings.people.length) sheetPerson(); break;
     case 'split-person': UI.split.pid = t.dataset.id; renderSplit(); break;
     case 'split-by': UI.split.by = t.dataset.v; renderSplit(); break;
@@ -2871,6 +2879,27 @@ document.addEventListener('focusout', (e) => { if (e.target.id === 'amtIn') setT
 if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (nativeOn() && UI.kbOK && viewH() > UI.kbH0 - 60) endNative(false); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'budgetIn') e.target.blur(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) rerender(); });
+// Long-press the dial (not while typing): a bubble explains the blue pace tick. A plain tap still opens the keyboard.
+(function paceHint() {
+  let timer = null, sx = 0, sy = 0, hideT = null;
+  const bubble = document.createElement('div'); bubble.className = 'pace-bubble'; bubble.hidden = true; document.body.appendChild(bubble);
+  const show = () => {
+    const h = UI.hs; if (!h || !h.per || h.pace == null) return;
+    const d = h.pace - h.spent, r = $('#dial').getBoundingClientRect();
+    bubble.innerHTML = `<b>Rythme : ${money0(h.pace)} aujourd'hui</b>${Math.abs(d) < 100 ? 'Tu es pile dans le rythme.' : d > 0 ? `Tu as ${money0(d)} d'avance sur le rythme.` : `Tu dépenses ${money0(-d)} plus vite que le rythme.`}<br><span style="opacity:.75;font-weight:600">Le trait bleu : ce que tu aurais dépensé en répartissant ${money0(h.free)} également sur ${h.len} jours.</span>`;
+    bubble.style.left = (r.left + r.width / 2) + 'px'; bubble.style.top = (r.top + r.height / 2) + 'px';
+    bubble.hidden = false; buzz('tile'); UI.paceShown = Date.now();
+    clearTimeout(hideT); hideT = setTimeout(() => { bubble.hidden = true; }, 4000);
+  };
+  document.addEventListener('touchstart', (e) => {
+    if (!e.target.closest('#dial') || nativeOn() || e.touches.length > 1) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY; clearTimeout(timer); timer = setTimeout(show, 450);
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => { if (timer && Math.hypot(e.touches[0].clientX - sx, e.touches[0].clientY - sy) > 10) { clearTimeout(timer); timer = null; } }, { passive: true });
+  document.addEventListener('touchend', () => { clearTimeout(timer); timer = null; });
+  document.addEventListener('scroll', () => { bubble.hidden = true; }, { passive: true });
+  document.addEventListener('contextmenu', (e) => { if (e.target.closest('#dial')) e.preventDefault(); });
+})();
 // Long-press a category tile, then slide over the others: a bubble names the tile under the finger
 // (with a light tick on each change); lifting the finger picks it. A quick swipe still scrolls the tiles.
 (function tileScrub() {

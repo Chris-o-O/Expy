@@ -35,6 +35,7 @@ Tableau · Dettes · **Saisie** (bouton central surélevé, écran de lancement 
 - Saisie : « Faisable à la maison », « Partagé », « Note, date » et le bouton ✓ n'apparaissent que pendant une saisie (classe `#v-home.typing` : clavier ouvert, montant tapé, partage ou options ouverts). Avec le pavé intégré, leur place reste réservée (visibility) pour que les touches ne bougent pas.
 - Entrée d'argent (v1.21) : bascule « Entrée d'argent » pendant la saisie (`UI.income`, classe `#v-home.inc` : montant vert, catégories masquées, note « De qui ? »). `settings.incomes` = `{id, amt, ts, note, acc}` : ajoutée au compte de paie et au « Reste » de la période (`homeState().inc`) ; liste et suppression dans Stats.
 - Catégories (v1.21) : pastille au nom sous la tuile choisie (`data-name`, `::after`) ; appui long (280 ms) sur une tuile puis glisser = bulle avec le nom de la tuile sous le doigt + petit tic, relâcher choisit (`tileScrub`, événements tactiles ; un glissement rapide fait toujours défiler).
+- Repère de rythme (trait bleu sur l'anneau / la barre) = `homeState().pace` = libre × (jour − 0,5) ÷ durée. v1.23 : « Rythme X $ » dans la légende sous le cadran ; appui long (450 ms) sur le cadran = bulle explicative (avance ou retard sur le rythme) ; un toucher simple ouvre toujours le clavier (`UI.paceShown` bloque l'ouverture juste après l'appui long).
 - Tableau de bord : Mes comptes (+ bouton Foresight), carte « Partages » (on te doit / tu dois, par personne → relevé).
 
 ## Règles de calcul
