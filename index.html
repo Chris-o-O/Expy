@@ -117,7 +117,7 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 #v-home { gap: 8px; }
 .homehead .per { font-size: 13px; font-weight: 700; color: var(--muted); border: 0; background: transparent; padding: 0; }
 .daypill { font-size: 12px; font-weight: 800; background: var(--fg); color: var(--bg); padding: 5px 11px; border-radius: 999px; }
-:root { --c-debt: #8B3DFF; --c-save: #12A150; --mo-ms: 520ms; --mo-ease: cubic-bezier(.65,0,.35,1); }
+:root { --c-debt: #8B3DFF; --c-save: #12A150; --mo-ms: 920ms; --mo-ease: cubic-bezier(.65,0,.35,1); }
 .dial { --ring: min(222px, 26vh); --ring: min(222px, 26dvh); position: relative; width: var(--ring); height: var(--ring); margin: 0 auto; container-type: inline-size; flex: none; max-width: 100%; transition: width var(--mo-ms) var(--mo-ease), height var(--mo-ms) var(--mo-ease); }
 .dial > svg { position: absolute; left: 50%; top: 0; width: var(--ring); height: var(--ring); margin-left: calc(var(--ring) / -2); display: block; transition: opacity .22s, transform var(--mo-ms) var(--mo-ease); transform-origin: 50% 100%; }
 /* Keyboard open: the ring flattens into a bar, the amount grows */
@@ -187,6 +187,14 @@ body.appkeys .nat-add { display: none; }
 @keyframes tick { 0% { transform: scale(1); } 35% { transform: scale(1.12); } 100% { transform: scale(1); } }
 body.nofx .fab, body.nofx .keypad .add, body.nofx .tile { transition: none; }
 .hbar.live i, .hbar.live b { transition: none; }
+.det { display: flex; flex-direction: column; gap: 6px; padding: 14px; }
+.det-top { display: flex; justify-content: space-between; align-items: baseline; }
+.det-amt { font-size: 24px; font-weight: 800; } .det-when { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.det-who { font-weight: 800; } .det-raw { font-size: 12px; color: var(--muted); }
+.det-cats { flex-wrap: wrap; overflow: visible; margin-inline: 0; padding-inline: 0; }
+.pay-step { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; font-weight: 700; font-size: 14px; }
+.pay-n { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface-2); font-weight: 800; font-size: 13px; }
+.pay-n.ok { background: var(--ok); color: #fff; }
 .opts-row { flex-wrap: wrap; }
 #v-home.inc .tiles, #v-home.inc #homeToggle, #v-home.inc .split-row { display: none; }
 #v-home.inc .amount .big { color: var(--ok); }
@@ -613,7 +621,7 @@ function defaultSettings() {
     leftoverToDebt: true, reviewed: {},
     alerts: {}, lastExport: null, theme: 'auto',
     people: [], settles: [], lastSplit: null, goals: [], debtReserve: false, debtGoalBy: null, debtSince: null, kb: 'native',
-    profile: null, profileSkip: false, accounts: [], fx: true, haptic: 2, name: '', incomes: [],
+    profile: null, profileSkip: false, accounts: [], fx: true, haptic: 2, name: '', incomes: [], merchantCats: {},
   };
 }
 const DEFAULT_CATS = [
@@ -718,6 +726,7 @@ function normalize(st) {
   if (![1, 2, 3].includes(s.haptic)) s.haptic = 2;
   s.name = typeof s.name === 'string' ? s.name.trim().slice(0, 24) : '';
   if (!Array.isArray(s.incomes)) s.incomes = [];
+  if (!s.merchantCats || typeof s.merchantCats !== 'object') s.merchantCats = {};
   s.incomes = s.incomes.filter(i => i && i.id && i.amt > 0 && typeof i.ts === 'string');
   s.v = 2;
   return s;
@@ -766,7 +775,7 @@ const mKey = (mk) => 'm-' + mk;
 /* Android app (Capacitor, v1.22): the same code runs inside the APK. What a WebView cannot do
    (download files, the share sheet, vibrations) goes through Capacitor's native plugins. */
 const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-const NP = NATIVE ? Object.fromEntries(['Filesystem', 'Share', 'Haptics', 'App'].map(n => [n, window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin(n) : window.Capacitor.Plugins[n]])) : null;
+const NP = NATIVE ? Object.fromEntries(['Filesystem', 'Share', 'Haptics', 'App', 'PayNotif'].map(n => [n, window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin(n) : window.Capacitor.Plugins[n]])) : null;
 // File export: a normal browser download (or the share sheet when the browser offers it for files).
 // In the app: the file is written to the cache and handed to Android's share sheet (Drive, Files…).
 S.dl = NATIVE ? {
@@ -1256,7 +1265,7 @@ function dialSegs(view) {
    so it follows the dial resizing at the same time. */
 // One timeline for everything that moves when the keyboard opens: the CSS (dial size, text) uses
 // --mo-ms / --mo-ease, the tape uses MORPH with the same duration and curve.
-const MORPH = { ms: 520, a: .62, b: .45 };
+const MORPH = { ms: 920, a: .85, b: .68 }; // réglé par Chris dans le labo : Douce · 920 ms · 85 % autour de « Saisie »
 const easeInOutCubic = (k) => k < .5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
 const smooth = (e0, e1, x) => { const k = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return k * k * (3 - 2 * k); };
 function morphDial(toBar, done) {
@@ -1380,6 +1389,7 @@ function pendingReview() {
 }
 function renderBanners() {
   const out = [];
+  if (UI.detected && UI.detected.length) out.push(`<div class="banner" style="border-color:var(--accent)"><span><b>${UI.detected.length} dépense${UI.detected.length > 1 ? 's' : ''} détectée${UI.detected.length > 1 ? 's' : ''}</b> dans tes notifications de paiement.</span><button class="btn" data-act="det-open">Voir</button></div>`);
   if (UI.updateReady) out.push(`<div class="banner" style="border-color:var(--accent)"><span>Une nouvelle version d'Expy est prête.</span><button class="btn" data-act="apply-update">Mettre à jour</button></div>`);
   const rv = pendingReview();
   if (rv) {
@@ -2216,6 +2226,20 @@ function sheetWishSettings() {
 }
 
 /* ---------- Settings view ---------- */
+// Settings › App (Android app only): set up payment detection, step by step.
+function payCard() {
+  const st = UI.payStatus;
+  if (!st) { payStatus().then(() => { if (UI.tab === 'settings') renderSettings(); }); return '<div class="card"><h2>Dépenses détectées</h2><div class="note">Vérification…</div></div>'; }
+  const step = (ok, n, label, act, btn) => `<div class="pay-step"><span class="pay-n${ok ? ' ok' : ''}">${ok ? '✓' : n}</span><span class="pay-l">${label}</span>${ok ? '' : `<button class="btn ghost sm" data-act="${act}">${btn}</button>`}</div>`;
+  return `<div class="card"><h2>Dépenses détectées</h2>
+    <div class="note">Expy lit tes notifications de paiement (Google Wallet, ton appli bancaire) et te propose la dépense à ajouter. Seules les notifications avec un montant et un mot de paiement sont gardées, sur ce téléphone seulement.</div>
+    ${step(st.notify, 1, 'Expy peut t\'envoyer une notification', 'pay-notify', 'Autoriser')}
+    ${step(st.access, 2, 'Accès aux notifications du téléphone', 'pay-access', 'Ouvrir')}
+    ${st.access ? '' : `<div class="note">Si Android affiche <b>« Paramètre restreint »</b> (app installée hors Play Store) : ouvre les infos de l'app Expy, touche ⋮ en haut à droite › <b>Autoriser les paramètres restreints</b>, puis réessaie l'étape 2.</div><button class="btn ghost block" data-act="pay-appinfo">Infos de l'app Expy</button>`}
+    ${st.access ? `<label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" data-act="pay-on" ${st.on ? 'checked' : ''}>Détecter mes paiements</label>
+      <button class="btn ghost block" data-act="pay-test">Essayer avec un exemple</button>` : ''}
+  </div>`;
+}
 const SET_SECS = [
   ['profil', 'Profil', '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'],
   ['periodes', 'Périodes', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
@@ -2279,7 +2303,7 @@ function renderSettings() {
       ${s.lastExport ? `<div class="note">Dernier export : ${new Date(s.lastExport).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' })}</div>` : ''}
       ${hasEx ? '<button class="btn danger" data-act="clear-demo">Effacer les données d\'exemple</button>' : ''}
     </div>`,
-    app: `    <div class="card"><h2>Écran d'accueil</h2>
+    app: (NATIVE ? payCard() : '') + `    <div class="card"><h2>Écran d'accueil</h2>
       ${NATIVE ? '<div class="note">Tu utilises l\'app Android Expy. Tes données restent dans l\'app, sur ce téléphone.</div><a class="btn ghost block" href="https://github.com/Chris-o-O/Expy/releases/latest" target="_blank" rel="noopener">Dernière version (APK)</a>'
         : isStandalone() ? '<div class="note">L\'app est installée. L\'icône ouvre directement la saisie, même hors ligne.</div>'
         : UI.installEvt ? '<button class="btn" data-act="install">Installer l\'app</button><div class="note">L\'icône ouvrira directement la saisie, même hors ligne.</div>'
@@ -2296,13 +2320,13 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.23.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.24.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
 /* ---------- Sheets ---------- */
 function openSheet(html) { $('#sheetPanel').innerHTML = '<div class="grab"></div>' + html; $('#sheet').hidden = false; UI.confirm = null; const f = $('#sheetPanel [autofocus]'); if (f) setTimeout(() => f.focus(), 50); }
-function closeSheet() { $('#sheet').hidden = true; $('#sheetPanel').innerHTML = ''; UI.confirm = null; }
+function closeSheet() { UI.detOpen = false; $('#sheet').hidden = true; $('#sheetPanel').innerHTML = ''; UI.confirm = null; }
 
 // Edit a budget period, or create one (id null). Defaults for a new one: the day after the latest period,
 // for the same length and amount; with no period yet, the current calendar month.
@@ -2802,6 +2826,16 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'fut-mode': UI.futMode = t.dataset.m; renderFuture(); break;
+    case 'det-open': loadDetected().then(sheetDetected); break;
+    case 'det-cat': UI.detCat[t.dataset.id] = t.dataset.cat; for (const b of t.parentElement.children) b.setAttribute('aria-pressed', String(b === t)); break;
+    case 'det-add': detAdd(t.dataset.id); break;
+    case 'det-skip': detDone([t.dataset.id]); break;
+    case 'det-skip-all': detDone((UI.detected || []).map(d => d.id)); break;
+    case 'pay-notify': NP.PayNotif.requestNotify().then(() => payStatus()).then(renderSettings); break;
+    case 'pay-access': NP.PayNotif.openAccessSettings(); break;
+    case 'pay-appinfo': NP.PayNotif.openAppSettings(); break;
+    case 'pay-on': NP.PayNotif.setOn({ on: !(UI.payStatus && UI.payStatus.on) }).then(() => payStatus()).then(renderSettings); break;
+    case 'pay-test': NP.PayNotif.simulate({}).then((r) => { toast(r && r.kept ? 'Exemple ajouté : regarde la notification et le bandeau' : 'Exemple déjà reçu il y a moins de 3 min'); loadDetected(); }); break;
     case 'card-pay': sheetCardPay(t.dataset.id); break;
     case 'set-sec': UI.setSec = t.dataset.s; renderSettings(); window.scrollTo(0, 0); break;
     case 'goal-new': sheetGoal(null); break;
@@ -2942,6 +2976,83 @@ document.addEventListener('pointerdown', (e) => {
   const b = e.target.closest('#addBtn, #addBtn2, .tile'); if (!b || b.disabled) return;
   buzz(b.classList.contains('tile') ? 'tile' : 'press');
 });
+
+/* ---------- Detected payments (app only, v1.24) ----------
+   The native listener keeps payment notifications (Wallet, bank apps) as pending items {id, app, title, text,
+   cents, merchant, ts}. Expy shows them; each one is added (category remembered per merchant) or ignored. */
+const merchantKey = (m) => (m || '').toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿñæœ]+/g, ' ').trim();
+async function loadDetected() {
+  if (!NATIVE || !NP.PayNotif) return;
+  try { const r = await NP.PayNotif.pending(); UI.detected = (r && r.items) || []; } catch (e) { UI.detected = []; }
+  if (UI.tab === 'home') renderBanners();
+  if (!$('#sheet').hidden && UI.detOpen) sheetDetected();
+}
+// First time a merchant is seen: a guess from its name (then Expy remembers what you chose).
+const MERCHANT_HINTS = [
+  ['cafe', /caf[eé]|coffee|starbucks|tim hortons|second cup|van houtte|brûlerie|brulerie/],
+  ['restaurant', /resto|restaurant|bistro|pizza|sushi|burger|mcdonald|subway|a&w|poulet|thai|pho|ramen|brasserie|cantine|uber ?eats|doordash|skip/],
+  ['epicerie', /metro|iga|provigo|maxi|super ?c|loblaw|walmart|costco|adonis|march[eé]|[eé]picerie|grocery|sobeys|food basics|avril|rachelle/],
+  ['transport', /stm|opus|uber|lyft|bixi|communauto|essence|petro|shell|esso|ultramar|couche-tard|irving|parking|stationnement|via rail|exo/],
+  ['maison', /canadian tire|r[eé]no|home depot|ikea|bureau en gros|structube|dollarama|hydro|bell|vid[eé]otron|fizz|rogers|telus/],
+  ['livres', /librairie|renaud-bray|indigo|archambault|book|livre/],
+  ['jeux', /steam|playstation|xbox|nintendo|eb games|jeux/],
+  ['loisirs', /cin[eé]|cinema|netflix|spotify|disney|crave|billet|ticket|spa|gym|sport/],
+];
+function detGuessCat(d) {
+  const s = S.settings, has = (id) => s.cats.some(x => x.id === id);
+  const k = merchantKey(d.merchant);
+  if (k && s.merchantCats[k] && has(s.merchantCats[k])) return s.merchantCats[k];
+  const name = (d.merchant || d.title || '').toLowerCase();
+  const byName = s.cats.find(c => name && c.name.length > 3 && name.includes(c.name.toLowerCase()));
+  if (byName) return byName.id;
+  const hint = MERCHANT_HINTS.find(([id, re]) => has(id) && re.test(name));
+  return hint ? hint[0] : suggestCat(d.cents);
+}
+function sheetDetected() {
+  const list = UI.detected || [];
+  UI.detOpen = true;
+  if (!list.length) { closeSheet(); UI.detOpen = false; return; }
+  UI.detCat = UI.detCat || {};
+  for (const d of list) if (!UI.detCat[d.id]) UI.detCat[d.id] = detGuessCat(d);
+  openSheet(`<h1>Dépenses détectées</h1>
+    <div class="note">Repérées dans tes notifications de paiement. Vérifie la catégorie, puis ajoute ou ignore.</div>
+    ${list.map(d => `<div class="card det">
+      <div class="det-top"><span class="det-amt num">${money(d.cents)}</span><span class="det-when">${esc(dateLabel(new Date(d.ts).toISOString()))}</span></div>
+      <div class="det-who">${esc(d.merchant || d.title || 'Commerçant inconnu')} <span class="muted">· ${esc(d.app || '')}</span></div>
+      <div class="det-raw">${esc(((d.title ? d.title + ' — ' : '') + (d.text || '')).slice(0, 140))}</div>
+      <div class="chips det-cats">${S.settings.cats.map(c => `<button type="button" class="chip" data-act="det-cat" data-id="${esc(d.id)}" data-cat="${esc(c.id)}" aria-pressed="${UI.detCat[d.id] === c.id}"><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.name)}</button>`).join('')}</div>
+      <div class="btn-row"><button class="btn" data-act="det-add" data-id="${esc(d.id)}">Ajouter</button><button class="btn ghost" data-act="det-skip" data-id="${esc(d.id)}">Ignorer</button></div>
+    </div>`).join('')}
+    ${list.length > 1 ? '<button class="btn ghost block" data-act="det-skip-all">Tout ignorer</button>' : ''}`);
+}
+async function detDone(ids) {
+  UI.detected = (UI.detected || []).filter(d => !ids.includes(d.id));
+  try { await NP.PayNotif.dismiss({ ids }); } catch (e) { }
+  renderBanners(); sheetDetected();
+}
+function detAdd(id) {
+  const d = (UI.detected || []).find(x => x.id === id); if (!d) return;
+  const cat = UI.detCat[id] || detGuessCat(d), ts = new Date(d.ts).toISOString();
+  const item = { id: uid(), amt: d.cents, cat, ts, home: !!catById(cat).home, note: d.merchant || '', src: 'notif' };
+  tagSource(item);
+  const mk = monthKey(new Date(ts));
+  (S.months[mk] = S.months[mk] || []).push(item);
+  charge(item, 1);
+  const k = merchantKey(d.merchant); if (k) S.settings.merchantCats[k] = cat;
+  persist(mKey(mk)); persist('settings');
+  buzz('hit'); toast(`${money(d.cents)} · ${catById(cat).name} ajoutée`);
+  detDone([id]); if (UI.tab === 'home') renderHome(); else rerender();
+}
+if (NATIVE && NP.PayNotif) {
+  NP.PayNotif.addListener('detected', () => loadDetected());
+  NP.App.addListener('resume', () => { loadDetected(); if (UI.tab === 'settings') payStatus().then(renderSettings); });
+  setTimeout(loadDetected, 400);
+}
+async function payStatus() {
+  if (!NATIVE || !NP.PayNotif) return null;
+  try { UI.payStatus = await NP.PayNotif.status(); } catch (e) { UI.payStatus = null; }
+  return UI.payStatus;
+}
 
 // Android back button (app only): close what is open, then go back to Saisie, then leave the app in the background.
 if (NATIVE) NP.App.addListener('backButton', () => {
