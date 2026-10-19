@@ -662,7 +662,7 @@ const CAT_ICONS = {
   _: '<path d="M4 12V5h7l9 9-7 7z"/><circle cx="8.5" cy="8.5" r="1"/>',
 };
 const ICON_NAMES = { cafe: 'Café', restaurant: 'Restaurant', epicerie: 'Épicerie', transport: 'Transport', maison: 'Maison', loisirs: 'Étoile', livres: 'Livre', jeux: 'Manette', autre: 'Points', sante: 'Santé', vetements: 'Vêtements', cadeau: 'Cadeau', voyage: 'Voyage', sport: 'Sport', cinema: 'Cinéma', telephone: 'Téléphone', animaux: 'Animaux', musique: 'Musique', abonnement: 'Abonnement', essence: 'Essence', _: 'Étiquette' };
-const catIconKey = (c) => (c.icon && CAT_ICONS[c.icon]) ? c.icon : (CAT_ICONS[c.id] ? c.id : '_');
+const catIconKey = (c) => (c.icon && Object.hasOwn(CAT_ICONS, c.icon)) ? c.icon : (Object.hasOwn(CAT_ICONS, c.id) ? c.id : '_');
 const catIconSvg = (c) => `<svg viewBox="0 0 24 24" aria-hidden="true">${CAT_ICONS[catIconKey(c)]}</svg>`;
 // Brings settings saved by an older version up to date.
 function normalize(st) {
@@ -728,8 +728,45 @@ function normalize(st) {
   if (!Array.isArray(s.incomes)) s.incomes = [];
   if (!s.merchantCats || typeof s.merchantCats !== 'object') s.merchantCats = {};
   s.incomes = s.incomes.filter(i => i && i.id && i.amt > 0 && typeof i.ts === 'string');
+  // A restored backup may come from anywhere: keep only well-formed values (numbers, dates, #RRGGBB colors, text ids).
+  const num = (v, d = 0) => Number.isFinite(+v) && v !== null && v !== '' ? +v : d;
+  const txt = (v, d = '') => typeof v === 'string' ? v : typeof v === 'number' ? String(v) : d;
+  const isDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const isColor = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+  if (!Array.isArray(s.cats) || !s.cats.length) s.cats = DEFAULT_CATS.map(c => Object.assign({}, c));
+  s.cats = s.cats.filter(c => c && c.id != null).map((c, i) => Object.assign({}, c, {
+    id: txt(c.id), name: txt(c.name, 'Catégorie'), color: isColor(c.color) ? c.color : PALETTE[i % PALETTE.length],
+    limit: c.limit == null ? null : num(c.limit, null), home: !!c.home, icon: typeof c.icon === 'string' ? c.icon : undefined }));
+  if (!Array.isArray(s.debts)) s.debts = [];
+  s.debts = s.debts.filter(d => d && d.id != null).map(d => Object.assign({}, d, { id: txt(d.id), name: txt(d.name, 'Dette'), bal: num(d.bal), apr: num(d.apr), min: num(d.min) }));
+  s.periods = s.periods.filter(p => p && isDate(p.start) && isDate(p.end)).map(p => Object.assign({}, p, { id: txt(p.id, 'p' + uid()), amount: num(p.amount) }));
+  s.wishes = s.wishes.filter(w => w && w.id != null).map(w => Object.assign({}, w, { id: txt(w.id), name: txt(w.name, 'Souhait'), price: num(w.price) }));
+  s.goals.forEach(g => { g.id = txt(g.id); g.name = txt(g.name, 'Objectif'); });
+  s.people.forEach(p => { p.id = txt(p.id); p.name = txt(p.name, 'Personne'); });
+  s.accounts.forEach(a => { a.id = txt(a.id); a.name = txt(a.name, 'Compte'); });
+  s.incomes.forEach(i => { i.id = txt(i.id); i.amt = num(i.amt); i.note = txt(i.note); });
+  if (!Array.isArray(s.payments)) s.payments = [];
+  s.payments = s.payments.filter(x => x && typeof x === 'object').map(x => Object.assign({}, x, { amt: num(x.amt) }));
+  s.settles = s.settles.filter(x => x && typeof x === 'object').map(x => Object.assign({}, x, { amt: num(x.amt) }));
+  if (s.profile) {
+    const q = s.profile;
+    q.age = q.age == null || q.age === '' ? null : num(q.age, null);
+    for (const k of ['pay', 'fixedCommon', 'save', 'debt']) q[k] = num(q[k]);
+    q.fixedItems = q.fixedItems.filter(f => f && typeof f === 'object').map(f => Object.assign({}, f, { id: txt(f.id, 'f' + uid()), name: txt(f.name, 'Charge'), amt: num(f.amt) }));
+  }
   s.v = 2;
   return s;
+}
+// Expenses by month, keeping only well-formed ones (a restored backup may come from anywhere).
+function cleanMonths(m) {
+  const out = {};
+  if (!m || typeof m !== 'object') return out;
+  for (const [k, list] of Object.entries(m)) {
+    if (!/^\d{4}-\d{2}$/.test(k) || !Array.isArray(list)) continue;
+    out[k] = list.filter(i => i && typeof i === 'object' && Number.isFinite(+i.amt) && typeof i.ts === 'string' && !isNaN(new Date(i.ts)))
+      .map(i => Object.assign({}, i, { id: String(i.id ?? uid()), amt: +i.amt, cat: String(i.cat ?? 'autre'), note: typeof i.note === 'string' ? i.note : '' }));
+  }
+  return out;
 }
 const S = { settings: defaultSettings(), months: {}, dirty: new Set(), mode: 'local', persisted: null, dl: null };
 const UI = { split: { on: false, pid: null, pct: 50, by: 'me' }, tab: 'home', amt: '', cat: null, catPicked: false, home: false, homePicked: false, optsOpen: false, statsMonth: curMonth(), toastTimer: null, confirm: null, installEvt: null };
@@ -751,7 +788,7 @@ function applyTheme() {
 function applyCache(c) {
   if (!c) return;
   S.settings = normalize(c.settings);
-  S.months = c.months || {};
+  S.months = cleanMonths(c.months);
 }
 let saveFailed = false;
 function saveCache() {
@@ -1345,7 +1382,7 @@ function renderSummary() {
 function renderRing() {
   const h = UI.hs; if (!h) return;
   const e = entryCost(), C = RING_C;
-  const arc = (a, l, color, cap) => l > 0.0004 ? `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" stroke-linecap="${cap || 'butt'}" style="stroke:${color}" stroke-dasharray="${(l * C).toFixed(1)} ${(C - l * C + 2).toFixed(1)}" stroke-dashoffset="${(-a * C).toFixed(1)}" transform="rotate(-90 120 120)"/>` : '';
+  const arc = (a, l, color, cap) => l > 0.0004 ? `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" stroke-linecap="${cap || 'butt'}" style="stroke:${esc(color)}" stroke-dasharray="${(l * C).toFixed(1)} ${(C - l * C + 2).toFixed(1)}" stroke-dashoffset="${(-a * C).toFixed(1)}" transform="rotate(-90 120 120)"/>` : '';
   let svg = `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" style="stroke:var(--surface-2)"/>`, note, label;
   if (h.per) {
     const A = h.amount, rs = h.rs;
@@ -1565,7 +1602,7 @@ function renderProfile(err) {
       ${pf.freq === 'semimonthly' ? `<label>Jours de paie<select class="field" id="pfSemi"><option value="15-end" ${pf.semi !== '1-15' ? 'selected' : ''}>Le 15 et le dernier jour du mois</option><option value="1-15" ${pf.semi === '1-15' ? 'selected' : ''}>Le 1er et le 15</option></select></label>`
         : `<label>Date d'une paie (la dernière ou la prochaine)<input class="field" id="pfNext" type="date" value="${esc(pf.next)}"></label>`}
       <label>Prénom (facultatif)<input class="field" id="pfName" maxlength="24" value="${esc(s.name || '')}" placeholder="Affiché sur ta pastille" autocomplete="given-name"></label>
-      <label>Âge (facultatif)<input class="field num" id="pfAge" inputmode="numeric" value="${pf.age ?? ''}" placeholder="Sert au repère d'épargne"></label>`;
+      <label>Âge (facultatif)<input class="field num" id="pfAge" inputmode="numeric" value="${esc(pf.age ?? '')}" placeholder="Sert au repère d'épargne"></label>`;
   } else if (st === 1) {
     h += `<h2>Compte commun</h2><label class="chk"><input type="checkbox" id="pfCommonOn" ${pf.common ? 'checked' : ''}>Je verse un montant au compte commun</label>`;
     if (pf.common) h += field('Versement au compte commun, par paie ($)', 'pfCommon', pf.fixedCommon)
@@ -1584,7 +1621,7 @@ function renderProfile(err) {
       <div class="two"><select class="field" id="pfAccKind"><option value="cheque">Chèque</option><option value="epargne">Épargne</option></select><button type="button" class="btn ghost" data-act="pf-acc-add">Ajouter</button></div>
       ${s.accounts.length ? `<div class="two"><label>La paie arrive dans<select class="field" id="pfPayAcc">${s.accounts.map(a => `<option value="${esc(a.id)}" ${(pf.payAcc || (s.accounts.find(x => x.kind === 'cheque') || s.accounts[0]).id) === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label>
         <label>L'épargne va dans<select class="field" id="pfSaveAcc"><option value="">Reste dans le compte de paie</option>${s.accounts.map(a => `<option value="${esc(a.id)}" ${(pf.saveAcc !== undefined ? pf.saveAcc : (s.accounts.find(x => x.kind === 'epargne') || {}).id) === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label></div>` : ''}
-      <h2>Cartes de crédit et dettes</h2>${s.debts.filter(d => d.bal > 0).map(d => `<div class="dline pfrow"><span>${esc(d.name)} <span class="muted">· ${String(d.apr).replace('.', ',')} %</span></span>
+      <h2>Cartes de crédit et dettes</h2>${s.debts.filter(d => d.bal > 0).map(d => `<div class="dline pfrow"><span>${esc(d.name)} <span class="muted">· ${esc(String(d.apr).replace('.', ','))} %</span></span>
         <input class="field num" style="width:110px" data-pfdebt="${esc(d.id)}" inputmode="decimal" value="${esc(toInputMoney(d.bal))}" aria-label="Solde de ${esc(d.name)}"><span style="width:32px"></span></div>`).join('')}
       <div class="two"><input class="field" id="pfCardName" maxlength="24" placeholder="ex. Visa"><input class="field num" id="pfCardBal" inputmode="decimal" placeholder="Solde $"></div>
       <div class="two"><input class="field num" id="pfCardApr" inputmode="decimal" placeholder="Taux % (ex. 20,99)"><button type="button" class="btn ghost" data-act="pf-card-add">Ajouter</button></div>
@@ -1920,7 +1957,7 @@ function renderDebts() {
     const interestOnly = d.bal > 0 && d.min <= d.bal * d.apr / 1200;
     return `<li><button class="debt" data-act="debt-edit" data-id="${esc(d.id)}">
       <span class="l1"><span class="name">${esc(d.name)}${d.id === sim.priority && d.bal > 0 ? '<span class="tag prio">Prioritaire</span>' : ''}${d.ex ? '<span class="tag ex">ex.</span>' : ''}</span><span class="bal num">${money(d.bal)}</span></span>
-      <span class="l2"><span class="mono">${String(d.apr).replace('.', ',')} % · min ${money0(d.min)}/mois</span><span data-payoff="${esc(d.id)}">${d.bal <= 0 ? 'Soldée' : 'Soldée en ' + payoffLabel(k)}</span></span>
+      <span class="l2"><span class="mono">${esc(String(d.apr).replace('.', ','))} % · min ${money0(d.min)}/mois</span><span data-payoff="${esc(d.id)}">${d.bal <= 0 ? 'Soldée' : 'Soldée en ' + payoffLabel(k)}</span></span>
       ${d.bal > 0 && totalBal > 0 ? `<span class="meter" aria-hidden="true"><i style="width:${Math.max(3, d.bal / totalBal * 100).toFixed(1)}%"></i></span>` : ''}
       ${interestOnly ? `<span class="warnline">Le minimum ne couvre pas les intérêts (${money(Math.ceil(d.bal * d.apr / 1200))}/mois).</span>` : ''}
     </button></li>`;
@@ -2249,7 +2286,7 @@ const SET_SECS = [
   ['app', 'App', '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>'],
 ];
 const initials = (n) => (n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
-const avatar = (name, size) => `<span class="av${size ? ' ' + size : ''}" aria-hidden="true">${initials(name) || '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>'}</span>`;
+const avatar = (name, size) => `<span class="av${size ? ' ' + size : ''}" aria-hidden="true">${esc(initials(name)) || '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>'}</span>`;
 function renderSettings() {
   const s = S.settings;
   const periods = s.periods.slice().sort((a, b) => b.start.localeCompare(a.start));
@@ -2320,7 +2357,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.24.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.24.1${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -2432,8 +2469,8 @@ function sheetPeriod(id) {
   }
   openSheet(`<h1>${p ? 'Modifier la période' : 'Nouvelle période'}</h1>
     <form class="form" id="perForm">
-      <div class="two"><label>Début<input class="field" id="perStart" type="date" value="${start}"></label>
-      <label>Fin (incluse)<input class="field" id="perEnd" type="date" value="${end}"></label></div>
+      <div class="two"><label>Début<input class="field" id="perStart" type="date" value="${esc(start)}"></label>
+      <label>Fin (incluse)<input class="field" id="perEnd" type="date" value="${esc(end)}"></label></div>
       <div class="btn-row" role="group" aria-label="Raccourcis de durée">
         <button type="button" class="btn ghost" data-span="month">1 mois</button>
         <button type="button" class="btn ghost" data-span="14">2 semaines</button>
@@ -2681,13 +2718,14 @@ $('#importIn').addEventListener('change', async (e) => {
   let data;
   try { data = JSON.parse(await file.text()); } catch (err) { toast("Ce fichier n'est pas une sauvegarde valide."); return; }
   if (!data || data.app !== 'budget-perso-express' || !data.settings || typeof data.months !== 'object') { toast("Ce fichier n'est pas une sauvegarde de Budget perso express."); return; }
-  const n = Object.values(data.months).flat().length;
-  openSheet(`<h1>Restaurer la sauvegarde ?</h1><p class="note">Le fichier contient ${n} dépenses et ${(data.settings.debts || []).length} dettes. Il remplace toutes les données actuelles.</p>
+  const settings = normalize(data.settings), months = cleanMonths(data.months);
+  const n = Object.values(months).reduce((t, l) => t + l.length, 0);
+  openSheet(`<h1>Restaurer la sauvegarde ?</h1><p class="note">Le fichier contient ${n} dépenses et ${settings.debts.length} dettes. Il remplace toutes les données actuelles.</p>
     <button class="btn block" id="impOk">Remplacer mes données</button><button class="btn ghost block" data-act="close-sheet">Annuler</button>`);
   $('#impOk').onclick = () => {
     const oldKeys = Object.keys(S.months).map(mKey);
-    S.settings = normalize(data.settings);
-    S.months = data.months;
+    S.settings = settings;
+    S.months = months;
     persist('settings', ...new Set([...oldKeys, ...Object.keys(S.months).map(mKey)]));
     applyTheme(); closeSheet(); resetEntry(); rerender(); toast('Sauvegarde restaurée');
   };

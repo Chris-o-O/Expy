@@ -18,6 +18,7 @@ Dépôt : Chris-o-O/Expy, déployé sur GitHub Pages depuis `main`.
 - Dans `settings` : `periods`, `cats`, `debts`, `payments`, `debtBudget`, `wishes`, `goals`, `people`, `settles`, `theme`, `kb`, etc. `normalize()` migre les anciennes données.
 - Une dépense partagée garde `amt` = la part de l'utilisateur (ce qui compte partout) et `split = {pid,total,pct,by}`.
 - `window.__budget` expose des fonctions pour les tests.
+- Sécurité (v1.24.1) : tout texte venant des données passe par `esc()` avant d'aller dans du HTML (notifications de paiement comprises). Une sauvegarde restaurée peut venir de n'importe où : `normalize()` + `cleanMonths()` ne gardent que des valeurs bien formées (nombres, dates ISO, couleurs `#RRGGBB`, ids en texte), aussi au chargement du cache et avant d'afficher la fenêtre « Restaurer ».
 
 ## App Android (Capacitor, v1.22)
 - `index.html` reste la seule source. `npm run sync` = `scripts/build-www.mjs` (copie l'app dans `www/` + ajoute `capacitor.js`, seulement dans cette copie) puis `npx cap sync android`. Projet natif dans `android/` (appId `io.github.chrisoo.expy`).
