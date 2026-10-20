@@ -391,6 +391,9 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 .wish .w-when b { color: var(--fg); font-weight: 800; background: #0A0A0A; color: #fff; padding: 3px 10px; border-radius: 999px; }
 .wish .w-when.now b { background: #0E6B38; }
 .wish .w-when.never b { background: #B3261E; }
+.wish .w-when.late b { background: #B3261E; }
+.wish .w-env { font-size: 13px; color: var(--muted); font-weight: 600; }
+.wish .meter { width: 100%; margin-top: 2px; }
 .wish .w-side { display: flex; align-items: center; gap: 2px; }
 .wish .w-price { font-weight: 800; font-size: 24px; letter-spacing: -.03em; margin-right: 6px; }
 .rate .v { font-size: 38px; font-weight: 800; letter-spacing: -.04em; line-height: 1.1; }
@@ -749,7 +752,12 @@ function normalize(st) {
   if (!Array.isArray(s.debts)) s.debts = [];
   s.debts = s.debts.filter(d => d && d.id != null).map(d => Object.assign({}, d, { id: txt(d.id), name: txt(d.name, 'Dette'), bal: num(d.bal), apr: num(d.apr), min: num(d.min) }));
   s.periods = s.periods.filter(p => p && isDate(p.start) && isDate(p.end)).map(p => Object.assign({}, p, { id: txt(p.id, 'p' + uid()), amount: num(p.amount) }));
-  s.wishes = s.wishes.filter(w => w && w.id != null).map(w => Object.assign({}, w, { id: txt(w.id), name: txt(w.name, 'Souhait'), price: num(w.price) }));
+  s.wishes = s.wishes.filter(w => w && w.id != null).map(w => Object.assign({}, w, { id: txt(w.id), name: txt(w.name, 'Souhait'), price: num(w.price),
+    saved: Math.max(0, num(w.saved)), by: isDate(w.by) ? w.by : null }));
+  // v1.26: one envelope per wish. The old shared "already set aside" amount fills the envelopes in list order.
+  if (s.wishCushion > 0) { let c = num(s.wishCushion); for (const w of s.wishes) { const t = Math.min(c, Math.max(0, w.price - w.saved)); w.saved += t; c -= t; } }
+  s.wishCushion = 0;
+  if (!isDate(s.envFrom)) s.envFrom = todayISO();
   s.goals.forEach(g => { g.id = txt(g.id); g.name = txt(g.name, 'Objectif'); });
   s.people.forEach(p => { p.id = txt(p.id); p.name = txt(p.name, 'Personne'); });
   s.accounts.forEach(a => { a.id = txt(a.id); a.name = txt(a.name, 'Compte'); });
@@ -924,6 +932,8 @@ function trackingStart() {
 }
 const itemsOf = (mk) => S.months[mk] || [];
 const sumC = (arr) => arr.reduce((s, i) => s + i.amt, 0);
+// Against the threshold: a wish bought with its envelope only counts for what the envelope did not cover.
+const spentC = (arr) => arr.reduce((s, i) => s + i.amt - Math.min(i.env || 0, i.amt), 0);
 function allItems() { return Object.values(S.months).flat(); }
 function catOrder() {
   const since = Date.now() - 90 * 864e5;
@@ -960,7 +970,16 @@ function reserveFor(p) {
     if (amt > 0) goals.push({ id: g.id, name: g.name, amt });
   }
   const need = goals.reduce((a, g) => a + g.amt, 0), save = s.profile ? 0 : need;
-  return { debt, goals, save, need, total: debt + save };
+  // Wishes with a target date: what is missing in the envelope, spread the same way (a planned purchase, so from the threshold).
+  const wishes = [];
+  for (const w of s.wishes) {
+    const rem = w.price - (w.saved || 0);
+    if (!w.by || rem <= 0 || w.by < p.start || (w.added && p.end < w.added)) continue;
+    const amt = Math.min(Math.round(rem * L / spanTo(w.by)), rem);
+    if (amt > 0) wishes.push({ id: w.id, name: w.name, amt });
+  }
+  const wish = wishes.reduce((a, w) => a + w.amt, 0);
+  return { debt, goals, save, need, wishes, wish, total: debt + save + wish };
 }
 // Average monthly amount left under the threshold (finished periods), added to debt repayment when enabled.
 function leftoverExtra() {
@@ -1185,7 +1204,7 @@ function addExpense() {
   if (shared) { item.split = { pid: sp.pid, total, pct: sp.pct, by: sp.by }; S.settings.lastSplit = { pid: sp.pid, pct: sp.pct, by: sp.by }; persist('settings'); }
   const per = periodFor(dayOfItem(item));
   const isActive = per && per === activePeriod();
-  const before = per ? sumC(itemsIn(per)) : 0;
+  const before = per ? spentC(itemsIn(per)) : 0;
   tagSource(item);
   (S.months[mk] = S.months[mk] || []).push(item);
   charge(item, 1);
@@ -1311,7 +1330,7 @@ function ringCatchUp() {
 function dialSegs(view) {
   const h = UI.hs; if (!h || !h.per) return [];
   const A = h.amount, rs = h.rs, e = entryCost();
-  const fs = Math.min(rs.save / A, 1), fd = Math.min(rs.debt / A, 1 - fs), sp = Math.min(view / A, 1);
+  const fs = Math.min((rs.save + rs.wish) / A, 1), fd = Math.min(rs.debt / A, 1 - fs), sp = Math.min(view / A, 1);
   const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)';
   const out = [[1 - fs, fs, 'var(--c-save)', 'butt'], [1 - fs - fd, fd, 'var(--c-debt)', 'butt'], [0, sp, hot, 'round']];
   if (e > 0) out.push([sp, Math.min(e / A, 1 - sp), catById(UI.cat).color, 'round']);
@@ -1364,7 +1383,7 @@ const RING_C = 2 * Math.PI * 100;
 function homeState() {
   const today = todayISO(), per = activePeriod(), mk = curMonth();
   const items = per ? itemsIn(per) : itemsOf(mk);
-  const spent = sumC(items), homeC = sumC(items.filter(i => i.home));
+  const spent = per ? spentC(items) : sumC(items), homeC = sumC(items.filter(i => i.home));
   if (!per) return { per: null, spent, homeC, label: cap(monthLabel(mk)) };
   const len = periodLen(per), elapsed = daysBetween(per.start, today) + 1, daysLeft = len - elapsed + 1;
   const rs = reserveFor(per), free = per.amount - rs.total;
@@ -1386,6 +1405,7 @@ function renderSummary() {
     lg.innerHTML = `<span>${dot('var(--fg)')}Dépensé ${money0(h.spent)}</span>`
       + (rs.debt ? `<span>${dot('var(--c-debt)')}Dettes ${money0(rs.debt)}</span>` : '')
       + (rs.save ? `<span>${dot('var(--c-save)')}Épargne ${money0(rs.save)}</span>` : '')
+      + (rs.wish ? `<span>${dot('var(--c-save)')}Souhaits ${money0(rs.wish)}</span>` : '')
       + (h.inc ? `<span style="color:var(--ok)">+${money0(h.inc)} reçus</span>` : '')
       + (h.pace != null ? `<span><b class="pace-mk" aria-hidden="true"></b>Rythme ${money0(h.pace)}</span>` : '')
       + `<span class="lk" aria-label="Objectifs">›</span>`;
@@ -1407,7 +1427,7 @@ function renderRing() {
   let svg = `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" style="stroke:var(--surface-2)"/>`, note, label;
   if (h.per) {
     const A = h.amount, rs = h.rs;
-    const fs = Math.min(rs.save / A, 1), fd = Math.min(rs.debt / A, 1 - fs);
+    const fs = Math.min((rs.save + rs.wish) / A, 1), fd = Math.min(rs.debt / A, 1 - fs);
     svg += arc(1 - fs, fs, 'var(--c-save)') + arc(1 - fs - fd, fd, 'var(--c-debt)');
     const sp = Math.min((UI.ringView ?? h.spent) / A, 1);
     const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)';
@@ -1433,7 +1453,7 @@ function renderRing() {
   $('#ring').innerHTML = svg; $('#ring').setAttribute('aria-label', label);
   const seg = (id, a, l, c) => { const el = $('#' + id); el.style.left = (a * 100).toFixed(2) + '%'; el.style.width = (Math.max(0, l) * 100).toFixed(2) + '%'; if (c) el.style.background = c; };
   if (h.per) {
-    const A = h.amount, rs = h.rs, fs = Math.min(rs.save / A, 1), fd = Math.min(rs.debt / A, 1 - fs), sp = Math.min((UI.barView ?? h.spent) / A, 1);
+    const A = h.amount, rs = h.rs, fs = Math.min((rs.save + rs.wish) / A, 1), fd = Math.min(rs.debt / A, 1 - fs), sp = Math.min((UI.barView ?? h.spent) / A, 1);
     seg('hb-sp', 0, sp, h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)');
     seg('hb-gh', sp, e > 0 ? Math.min(e / A, 1 - sp) : 0, catById(UI.cat).color);
     seg('hb-de', 1 - fs - fd, fd, 'var(--c-debt)'); seg('hb-sa', 1 - fs, fs, 'var(--c-save)');
@@ -1455,7 +1475,7 @@ function renderBanners() {
   if (UI.updateReady) out.push(`<div class="banner" style="border-color:var(--accent)"><span>Une nouvelle version d'Expy est prête.</span><button class="btn" data-act="apply-update">Mettre à jour</button></div>`);
   const rv = pendingReview();
   if (rv) {
-    const left = rv.amount - reserveFor(rv).total - sumC(itemsIn(rv));
+    const left = rv.amount - reserveFor(rv).total - spentC(itemsIn(rv));
     out.push(`<div class="banner warn" style="flex-direction:column;align-items:stretch;gap:8px">
       <span><b>Période du ${esc(shortDate(rv.start))} au ${esc(shortDate(rv.end))} terminée.</b> ${left >= 0 ? `Il te reste ${money(left)} sous le seuil.` : `Seuil dépassé de ${money(-left)}.`} ${S.settings.debts.some(d => d.bal > 0) ? 'As-tu remboursé ta carte ? Mets tes soldes à jour.' : 'Verse la part réservée à tes objectifs.'}</span>
       <span style="display:flex;gap:8px;justify-content:flex-end"><button class="link" data-act="review-later">Plus tard</button><button class="btn" data-act="review" data-id="${esc(rv.id)}">Mettre à jour</button></span></div>`);
@@ -1504,16 +1524,14 @@ function dashData() {
       rows: s.goals.map(g => ({ n: g.name, p: Math.min(100, Math.round(g.saved / g.target * 100)), d: `${money0(g.saved)} sur ${money0(g.target)} · d'ici le ${shortDate(g.by, true)}` })) };
   }
   if (s.wishes.length) {
-    const plan = wishPlan(); let cum = 0, wsum = 0, wtot = 0;
+    const plan = wishPlan(); let wsv = 0, wtot = 0;
     const rows = plan.rows.map(({ w, when, state }) => {
-      const cov = Math.max(0, Math.min(1, ((s.wishCushion || 0) - cum) / w.price)); cum += w.price;
-      let t = 0;
-      if (state === 'now') t = 1;
-      else if (state === 'date' && w.added && when > w.added) t = Math.max(0, Math.min(1, daysBetween(w.added, today) / daysBetween(w.added, when)));
-      const p = Math.round(Math.max(cov, t) * 100); wsum += p * w.price; wtot += w.price;
-      return { n: w.name, p, d: state === 'now' ? 'Possible maintenant' : state === 'date' ? `Vers le ${shortDate(when, true)}` : state === 'never' ? 'Pas atteignable au rythme actuel' : 'Date à estimer' };
+      const p = w.price ? Math.min(100, Math.round((w.saved || 0) / w.price * 100)) : 0; wsv += Math.min(w.saved || 0, w.price); wtot += w.price;
+      const tail = state === 'now' ? 'enveloppe pleine' : state === 'dated' ? `d'ici le ${shortDate(when, true)}` : state === 'late' ? 'date passée'
+        : state === 'date' ? `vers le ${shortDate(when, true)}` : state === 'never' ? 'pas atteignable au rythme actuel' : 'date à estimer';
+      return { n: w.name, p, d: `${money0(w.saved || 0)} sur ${money0(w.price)} · ${tail}` };
     });
-    out.wishes = { p: wtot ? Math.round(wsum / wtot) : 0, rows, sub: `${s.wishes.length} souhait${s.wishes.length > 1 ? 's' : ''} · ${money0(wtot)}` };
+    out.wishes = { p: wtot ? Math.round(wsv / wtot * 100) : 0, rows, sub: `${s.wishes.length} souhait${s.wishes.length > 1 ? 's' : ''} · ${money0(wtot)}` };
   }
   return out;
 }
@@ -1537,7 +1555,7 @@ function renderDash() {
   if (kinds.length) body += `<div class="card hero"><div class="big3">${kinds.map(k => `<div><span class="k">${k[2]}</span><span class="v num">${dd[k[0]].p}<small> %</small></span></div>`).join('')}</div>
     ${h && h.per ? `<div class="note">Période en cours : ${money0(h.left)} libres sur ${money0(h.amount)}${h.rs.total ? ` (${money0(h.rs.total)} réservés)` : ''} · jour ${h.elapsed} / ${h.len}.</div>` : ''}</div>`;
   body += `<ul class="list stack">${kinds.map(k => card(k[0], k[1], dd[k[0]])).join('')}</ul>
-    <p class="note">Dettes : part déjà remboursée d'après les paiements enregistrés. Souhaits : avancement vers la date estimée d'achat.</p>`;
+    <p class="note">Dettes : part déjà remboursée d'après les paiements enregistrés. Souhaits : ce qui est de côté dans chaque enveloppe.</p>`;
   $('#v-dash').innerHTML = body;
 }
 
@@ -1777,7 +1795,7 @@ function confidence() {
   const today = todayISO(), since = addDays(today, -120), payDays = 365.25 / PAY_FREQ[pf.freq][1], fx = pfFixed(pf);
   const done = s.periods.filter(p => !p.ex && p.end < today && p.end >= since);
   if (!done.length) return { n: 0 };
-  const rows = done.map(p => { const k = payDays / periodLen(p), spent = sumC(itemsIn(p)) * k, paid = p.paid ?? pf.pay;
+  const rows = done.map(p => { const k = payDays / periodLen(p), spent = spentC(itemsIn(p)) * k, paid = p.paid ?? pf.pay;
     return { cap: paid - fx - spent, over: spent - p.amount * k, payGap: paid - pf.pay }; });
   const n = rows.length, mu = rows.reduce((a, r) => a + r.cap, 0) / n;
   const sd = n > 1 ? Math.sqrt(rows.reduce((a, r) => a + (r.cap - mu) ** 2, 0) / (n - 1)) : 0;
@@ -2126,7 +2144,7 @@ function renderStats() {
 }
 
 function periodStatus(p) {
-  const t = sumC(itemsIn(p)), today = todayISO();
+  const t = spentC(itemsIn(p)), today = todayISO();
   const cur = p.start <= today && today <= p.end, future = p.start > today;
   let st;
   if (future) st = '<span class="muted">À venir</span>';
@@ -2153,7 +2171,7 @@ function autoLeftover() {
   const done = S.settings.periods.filter(p => p.end < today).sort((a, b) => b.end.localeCompare(a.end)).slice(0, 6);
   if (!done.length) return null;
   let left = 0, days = 0;
-  for (const p of done) { left += p.amount - reserveFor(p).total - sumC(itemsIn(p)); days += periodLen(p); }
+  for (const p of done) { left += p.amount - reserveFor(p).total - spentC(itemsIn(p)); days += periodLen(p); }
   const perDay = left / days;
   return { perDay, monthly: Math.round(perDay * 30.4375), n: done.length };
 }
@@ -2175,19 +2193,21 @@ function wishPlan() {
     debtMonths = debtSim().months;
     if (debtMonths != null) { const d = parseMonth(addMonths(curMonth(), debtMonths)); startDay = isoOf(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
   }
+  const per = activePeriod(), rs = per ? reserveFor(per) : null;
   let cum = 0;
   const rows = s.wishes.map(w => {
-    cum += w.price;
-    const need = cum - (s.wishCushion || 0);
+    const rem = Math.max(0, w.price - (w.saved || 0)), cur = rs ? (rs.wishes.find(x => x.id === w.id) || { amt: 0 }).amt : 0;
+    if (rem <= 0) return { w, rem, cur, when: null, state: 'now' };
+    if (w.by) return { w, rem, cur, when: w.by, state: w.by < todayISO() ? 'late' : 'dated' };
+    cum += rem;
     let when = null, state;
-    if (need <= 0) state = 'now';
-    else if (wishesWaitForDebts() && hasDebt && debtMonths == null) state = 'never';
+    if (wishesWaitForDebts() && hasDebt && debtMonths == null) state = 'never';
     else if (r.source === 'none') state = 'unknown';
     else if (!(r.perDay > 0)) state = 'never';
-    else { when = addDays(startDay, Math.ceil(need / r.perDay)); state = 'date'; }
-    return { w, need, when, state };
+    else { when = addDays(startDay, Math.ceil(cum / r.perDay)); state = 'date'; }
+    return { w, rem, cur, when, state };
   });
-  return { r, rows, hasDebt, debtMonths };
+  return { r, rows, hasDebt, debtMonths, per };
 }
 function relLabel(iso) {
   const d = daysBetween(todayISO(), iso);
@@ -2197,8 +2217,10 @@ function relLabel(iso) {
   return m < 24 ? `dans ${m} mois` : `dans ${Math.round(m / 12)} ans`;
 }
 function renderWishes() {
-  const s = S.settings, { r, rows, hasDebt, debtMonths } = wishPlan();
+  const s = S.settings, { r, rows, hasDebt, debtMonths, per } = wishPlan();
   let head = goalsSeg('wishes') + `<div class="view-head"><h1>Souhaits</h1><button class="btn" data-act="wish-new">Ajouter</button></div>`;
+  const saved = s.wishes.reduce((a, w) => a + (w.saved || 0), 0), total = s.wishes.reduce((a, w) => a + w.price, 0);
+  const resv = rows.reduce((a, x) => a + x.cur, 0), undated = rows.some(x => !x.w.by && x.rem > 0);
   let rateV, src, warn = '';
   if (r.source === 'fixed') { rateV = `≈ ${money0(r.monthly)}/mois`; src = 'Montant fixe que tu as indiqué.'; }
   else if (r.source === 'auto') {
@@ -2206,36 +2228,39 @@ function renderWishes() {
     src = `Ce qui est resté sous ton seuil, en moyenne sur ${r.n === 1 ? 'ta dernière période terminée' : 'tes ' + r.n + ' dernières périodes terminées'}.`;
     if (r.monthly <= 0) warn = `<div class="warntext">Tes dernières périodes ont dépassé le seuil : rien n'est mis de côté à ce rythme.</div>`;
   } else { rateV = '—'; src = "L'estimation commence après ta première période terminée. En attendant, tu peux indiquer un montant fixe."; }
-  const extras = [];
-  if (s.wishCushion) extras.push(`Déjà de côté : ${money0(s.wishCushion)}`);
-  if (wishesWaitForDebts() && hasDebt) extras.push((!s.wishAfterDebts ? 'Le reste du budget va d\'abord aux dettes. ' : '') + (debtMonths != null ? `Commence après la fin des dettes (${payoffLabel(debtMonths)})` : 'Commence après la fin des dettes, qui ne se termine pas au budget actuel'));
+  if (wishesWaitForDebts() && hasDebt) src += ' ' + (!s.wishAfterDebts ? 'Le reste va d\'abord aux dettes : ' : '') + (debtMonths != null ? `les souhaits sans date commencent après la fin des dettes (${payoffLabel(debtMonths)}).` : 'les souhaits sans date attendent la fin des dettes, qui ne se termine pas au budget actuel.');
   head += `<div class="card rate hero">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h2>Épargne pour tes souhaits</h2><button class="link" data-act="wish-settings" style="padding:0">Modifier</button></div>
-    <span class="v num">${rateV}</span>${warn}
-    <div class="note">${esc(src)}</div>
-    ${extras.length ? `<div class="note">${esc(extras.join(' · '))}</div>` : ''}
+    <h2>Dans tes enveloppes</h2>
+    <span class="v num">${money0(saved)} <span style="font-size:.5em;opacity:.7">sur ${money0(total)}</span></span>
+    <div class="note">${per && resv ? `Cette période, ${money0(resv)} sont réservés sur ton seuil pour les souhaits datés. ` : ''}Chaque souhait a son enveloppe. L'argent reste dans ton compte : l'enveloppe dit ce qui lui est destiné.</div>
   </div>`;
+  if (rows.length && undated) head += `<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h2>Souhaits sans date</h2><button class="link" data-act="wish-settings" style="padding:0">Modifier</button></div>
+    <span class="v num" style="font-size:22px;font-weight:800">${rateV}</span>${warn}
+    <div class="note">${esc(src)} À la fin de chaque période, ce montant remplit leurs enveloppes dans l'ordre de la liste.</div></div>`;
   if (!rows.length) {
-    $('#v-wishes').innerHTML = head + `<div class="empty">Ajoute ce que tu aimerais t'acheter. Expy estime quand tu pourras le payer comptant, d'après ce qui reste sous ton seuil à chaque période.</div>`;
+    $('#v-wishes').innerHTML = head + `<div class="empty">Ajoute ce que tu aimerais t'acheter. Avec une date cible, Expy met de côté une part de chaque période. Sans date, il estime quand tu pourras le payer comptant.</div>`;
     return;
   }
-  const li = rows.map(({ w, when, state }, i) => {
-    const txt = state === 'now' ? '<b>Possible maintenant</b> avec ce qui est de côté'
+  const li = rows.map(({ w, rem, cur, when, state }, i) => {
+    const txt = state === 'now' ? '<b>Enveloppe pleine</b> tu peux l\'acheter'
+      : state === 'dated' ? `<b>D'ici le ${esc(shortDate(when, true))}</b>${cur ? `${money0(cur)} réservés cette période` : relLabel(when)}`
+      : state === 'late' ? `<b>Date passée</b> il manque ${money0(rem)}`
       : state === 'date' ? `<b>Vers le ${esc(shortDate(when, true))}</b>${relLabel(when)}`
       : state === 'never' ? '<b>Pas atteignable</b> au rythme actuel'
       : 'Date estimée après ta première période terminée';
+    const pc = w.price ? Math.min(100, Math.round((w.saved || 0) / w.price * 100)) : 0;
     return `<li><div class="wish">
-      <button class="w-main" data-act="wish-edit" data-id="${esc(w.id)}"><span class="w-name">${esc(w.name)}${w.ex ? ' <span class="tag ex">ex.</span>' : ''}</span><span class="w-when ${state}">${txt}</span></button>
+      <button class="w-main" data-act="wish-edit" data-id="${esc(w.id)}"><span class="w-name">${esc(w.name)}${w.ex ? ' <span class="tag ex">ex.</span>' : ''}</span><span class="w-when ${state === 'dated' ? 'date' : state}">${txt}</span>
+        <span class="w-env num">${money0(w.saved || 0)} de côté · ${pc} %</span><span class="meter" aria-hidden="true"><i style="width:${Math.max(pc ? 3 : 0, pc)}%"></i></span></button>
       <span class="w-side"><span class="w-price num">${money0(w.price)}</span>
         <button class="icon-btn" data-act="wish-move" data-id="${esc(w.id)}" data-d="-1" aria-label="Monter ${esc(w.name)}" ${i === 0 ? 'disabled' : ''}>↑</button>
         <button class="icon-btn" data-act="wish-move" data-id="${esc(w.id)}" data-d="1" aria-label="Descendre ${esc(w.name)}" ${i === rows.length - 1 ? 'disabled' : ''}>↓</button></span>
     </div></li>`;
   }).join('');
-  const total = s.wishes.reduce((a, w) => a + w.price, 0);
-  const debtHint = hasDebt && !wishesWaitForDebts()
+  const debtHint = hasDebt && !wishesWaitForDebts() && undated
     ? `<p class="note">Tu as ${money0(s.debts.reduce((a, d) => a + d.bal, 0))} de dettes. Les rembourser avant coûte souvent moins cher que leurs intérêts : coche « Commencer après la libération des dettes » dans Modifier.</p>` : '';
   $('#v-wishes').innerHTML = head + `<ul class="list stack">${li}</ul>
-    <p class="note">Total : ${money0(total)}. Les souhaits sont financés dans l'ordre de la liste : chacun attend ceux du dessus. Les dates supposent que tu mets de côté ce qui reste sous ton seuil, sans crédit.</p>${debtHint}`;
+    <p class="note">Total : ${money0(total)}, dont ${money0(saved)} de côté. Un souhait daté prend sa part de chaque période, retirée de ton seuil. Les souhaits sans date se remplissent dans l'ordre de la liste.</p>${debtHint}`;
 }
 function sheetWish(id) {
   const s = S.settings, w = id ? s.wishes.find(x => x.id === id) : null;
@@ -2243,42 +2268,84 @@ function sheetWish(id) {
     <form class="form" id="wForm">
       <label>Quoi<input class="field" id="wName" maxlength="40" value="${w ? esc(w.name) : ''}" placeholder="ex. Casque audio" ${w ? '' : 'autofocus'}></label>
       <label>Prix ($)<input class="field num" id="wPrice" inputmode="decimal" value="${w ? esc(toInputMoney(w.price)) : ''}"></label>
+      <label>Date cible (facultatif)<input class="field" id="wBy" type="date" min="${todayISO()}" value="${w && w.by ? esc(w.by) : ''}"></label>
+      <div class="note" id="wByNote">Avec une date, Expy met de côté une part de chaque période sur ton seuil. Sans date, il estime quand ce sera possible.</div>
+      <label>Déjà de côté ($)<input class="field num" id="wSaved" inputmode="decimal" value="${w && w.saved ? esc(toInputMoney(w.saved)) : ''}" placeholder="0"></label>
       <div class="warntext" id="wErr" hidden></div>
       <button class="btn block" type="submit">${w ? 'Enregistrer' : 'Ajouter à la liste'}</button>
       ${w ? `<button class="btn ghost block" type="button" id="wBought">Je l'ai acheté</button><button class="btn danger block" type="button" id="wDel">Retirer de la liste</button>` : ''}
     </form>`);
+  // Live hint: what a target date would take from each period.
+  const hint = () => {
+    const by = $('#wBy').value, price = parseMoney($('#wPrice').value), sv = parseMoney($('#wSaved').value) || 0, per = activePeriod();
+    if (!by || !(price > 0) || !per) return;
+    const days = Math.max(periodLen(per), daysBetween(per.start, by) + 1), rem = Math.max(0, price - sv);
+    $('#wByNote').textContent = rem <= 0 ? 'Déjà couvert par ce qui est de côté.' : `Environ ${money0(Math.min(rem, Math.round(rem * periodLen(per) / days)))} mis de côté par période de ${periodLen(per)} jours, retirés de ton seuil.`;
+  };
+  for (const f of ['#wBy', '#wPrice', '#wSaved']) $(f).addEventListener('input', hint);
+  hint();
   $('#wForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const name = $('#wName').value.trim(), price = parseMoney($('#wPrice').value);
-    const err = !name ? 'Indique ce que tu veux acheter.' : (price == null || isNaN(price) || price <= 0) ? 'Indique le prix.' : '';
+    const name = $('#wName').value.trim(), price = parseMoney($('#wPrice').value), by = $('#wBy').value || null, sv = parseMoney($('#wSaved').value);
+    const err = !name ? 'Indique ce que tu veux acheter.' : (price == null || isNaN(price) || price <= 0) ? 'Indique le prix.'
+      : (sv != null && (isNaN(sv) || sv < 0)) ? 'Le montant de côté doit être un nombre.' : (by && by < todayISO() && (!w || by !== w.by)) ? 'Choisis une date à venir.' : '';
     if (err) { $('#wErr').textContent = err; $('#wErr').hidden = false; return; }
-    if (w) Object.assign(w, { name, price }); else s.wishes.push({ id: 'w' + uid(), name, price, added: todayISO() });
-    persist(); closeSheet(); renderWishes();
+    const saved = Math.min(price, sv || 0);
+    if (w) Object.assign(w, { name, price, by, saved }); else s.wishes.push({ id: 'w' + uid(), name, price, by, saved, added: todayISO() });
+    persist(); closeSheet(); rerender();
   });
   if (!w) return;
   $('#wDel').addEventListener('click', () => {
     if (UI.confirm !== 'wdel') { UI.confirm = 'wdel'; $('#wDel').textContent = 'Confirmer'; return; }
-    s.wishes = s.wishes.filter(x => x.id !== w.id); persist(); closeSheet(); renderWishes();
+    s.wishes = s.wishes.filter(x => x.id !== w.id); persist(); closeSheet(); rerender();
   });
-  // Bought: leave the list, use what was set aside, and prefill the expense entry.
-  $('#wBought').addEventListener('click', () => {
+  $('#wBought').addEventListener('click', () => sheetWishBought(w.id));
+}
+// Bought: the purchase is recorded as an expense; what the envelope covers does not count against the threshold again.
+function sheetWishBought(id) {
+  const s = S.settings, w = s.wishes.find(x => x.id === id); if (!w) return;
+  UI.wbCat = UI.wbCat && catById(UI.wbCat).id === UI.wbCat ? UI.wbCat : suggestCat(w.price);
+  openSheet(`<h1>${esc(w.name)} : acheté</h1>
+    <form class="form" id="wbForm">
+      <label>Prix payé ($)<input class="field num" id="wbAmt" inputmode="decimal" value="${esc(toInputMoney(w.price))}"></label>
+      <div class="note" id="wbNote"></div>
+      <div class="chips det-cats">${s.cats.map(c => `<button type="button" class="chip" data-cat="${esc(c.id)}" aria-pressed="${UI.wbCat === c.id}"><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.name)}</button>`).join('')}</div>
+      <div class="warntext" id="wbErr" hidden></div>
+      <button class="btn block" type="submit">Enregistrer l'achat</button>
+      <button class="btn ghost block" type="button" data-act="close-sheet">Annuler</button>
+    </form>`);
+  const note = () => {
+    const a = parseMoney($('#wbAmt').value) || 0, cov = Math.min(a, w.saved || 0);
+    $('#wbNote').textContent = cov >= a && a > 0 ? `Payé au complet par l'enveloppe (${money0(cov)}) : ton seuil ne bouge pas.`
+      : `${money0(cov)} viennent de l'enveloppe, ${money0(a - cov)} comptent dans ta période en cours.`;
+  };
+  $('#wbAmt').addEventListener('input', note); note();
+  $('#wbForm').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-cat]'); if (!b) return;
+    UI.wbCat = b.dataset.cat; for (const x of $('#wbForm .chips').children) x.setAttribute('aria-pressed', String(x.dataset.cat === UI.wbCat)); buzz('tile');
+  });
+  $('#wbForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const amt = parseMoney($('#wbAmt').value);
+    if (amt == null || isNaN(amt) || amt <= 0) { $('#wbErr').textContent = 'Indique le prix payé.'; $('#wbErr').hidden = false; return; }
+    const cat = UI.wbCat, ts = new Date().toISOString(), env = Math.min(amt, w.saved || 0);
+    const item = { id: uid(), amt, cat, ts, home: false, note: w.name.slice(0, 80), src: 'wish' };
+    if (env > 0) item.env = env;
+    tagSource(item);
+    const mk = monthKey(new Date(ts));
+    (S.months[mk] = S.months[mk] || []).push(item);
+    charge(item, 1);
     s.wishes = s.wishes.filter(x => x.id !== w.id);
-    s.wishCushion = Math.max(0, (s.wishCushion || 0) - w.price);
-    persist(); closeSheet();
-    resetEntry();
-    UI.amt = toInputMoney(w.price).replace('.', ',');
-    $('#noteIn').value = w.name.slice(0, 80);
-    UI.optsOpen = true; $('#opts').hidden = false; $('#optsBtn').setAttribute('aria-expanded', 'true');
-    UI.cat = suggestCat(amtCents()); UI.home = !!catById(UI.cat).home;
-    showTab('home'); renderAmount(); renderChips(); renderHomeToggle();
-    toast('Choisis la catégorie, puis Ajouter pour enregistrer la dépense.');
+    persist(mKey(mk)); persist('settings');
+    closeSheet(); buzz('hit'); rerender();
+    toast(env > 0 ? `${w.name} : ${money0(env)} pris dans l'enveloppe` : `${w.name} ajouté aux dépenses`);
   });
 }
 function sheetWishSettings() {
   const s = S.settings, auto = savingRate();
   const autoS = s.wishRate == null ? (auto.source === 'auto' ? `≈ ${money0(Math.max(auto.monthly, 0))}/mois` : 'pas encore disponible') : '';
   const st = { fixed: s.wishRate != null };
-  openSheet(`<h1>Épargne pour tes souhaits</h1>
+  openSheet(`<h1>Souhaits sans date</h1>
     <form class="form" id="wsForm">
       <div class="seg" role="group" aria-label="Source">
         <button type="button" data-src="auto" aria-pressed="${!st.fixed}">Estimation</button>
@@ -2286,9 +2353,9 @@ function sheetWishSettings() {
       </div>
       <div class="note" id="wsAutoNote" ${st.fixed ? 'hidden' : ''}>Moyenne de ce qui reste sous ton seuil sur tes dernières périodes terminées${autoS ? ' : ' + esc(autoS) : ''}.</div>
       <label id="wsFixedL" ${st.fixed ? '' : 'hidden'}>Montant mis de côté par mois ($)<input class="field num" id="wsFixed" inputmode="decimal" value="${s.wishRate != null ? esc(toInputMoney(s.wishRate)) : ''}"></label>
-      <label>Déjà de côté pour la liste ($)<input class="field num" id="wsCush" inputmode="decimal" value="${s.wishCushion ? esc(toInputMoney(s.wishCushion)) : ''}" placeholder="0"></label>
       <label class="chk" style="flex-direction:row;font-size:14px;color:var(--fg)"><input type="checkbox" id="wsDebt" ${s.wishAfterDebts ? 'checked' : ''}>Commencer après la libération des dettes</label>
       ${s.leftoverToDebt && s.debts.some(d => d.bal > 0) ? '<div class="note">Le reste de ton budget va aux dettes (onglet Dettes). Avec l\'estimation, tes souhaits attendent donc la fin des dettes. Un montant fixe, lui, est mis de côté à part.</div>' : ''}
+      <div class="note">Les souhaits avec une date cible ont leur propre réserve sur ton seuil.</div>
       <div class="warntext" id="wsErr" hidden></div>
       <button class="btn block" type="submit">Enregistrer</button>
     </form>`);
@@ -2300,11 +2367,9 @@ function sheetWishSettings() {
   });
   $('#wsForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const fx = parseMoney($('#wsFixed').value), cu = parseMoney($('#wsCush').value);
+    const fx = parseMoney($('#wsFixed').value);
     if (st.fixed && (fx == null || isNaN(fx) || fx <= 0)) { $('#wsErr').textContent = 'Indique le montant mis de côté chaque mois.'; $('#wsErr').hidden = false; return; }
-    if (cu != null && isNaN(cu)) { $('#wsErr').textContent = 'Le montant déjà de côté doit être un nombre.'; $('#wsErr').hidden = false; return; }
     s.wishRate = st.fixed ? fx : null;
-    s.wishCushion = cu || 0;
     s.wishAfterDebts = $('#wsDebt').checked;
     persist(); closeSheet(); renderWishes();
   });
@@ -2405,7 +2470,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.25.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.26.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -2556,7 +2621,7 @@ function sheetPeriod(id) {
     let target = p;
     if (p) Object.assign(p, { start: a, end: b, amount: v });
     else { target = { id: 'p' + uid(), start: a, end: b, amount: v }; s.periods.push(target); }
-    s.alerts[target.id] = level(sumC(itemsIn(target)), v);
+    s.alerts[target.id] = level(spentC(itemsIn(target)), v);
     persist('settings'); closeSheet(); rerender();
   });
   if (p) $('#perDel').addEventListener('click', () => {
@@ -2668,7 +2733,7 @@ function sheetDebt(id) {
 function sheetReview(pid) {
   const s = S.settings, p = s.periods.find(x => x.id === pid);
   if (!p) return;
-  const rs = reserveFor(p), spent = sumC(itemsIn(p)), left = p.amount - rs.total - spent;
+  const rs = reserveFor(p), spent = spentC(itemsIn(p)), left = p.amount - rs.total - spent;
   const payC = Math.max(0, left) + rs.debt;
   const active = s.debts.filter(d => d.bal > 0);
   const prio = debtSim().priority;
@@ -2682,7 +2747,7 @@ function sheetReview(pid) {
       <div><span class="k">Dépensé</span><span class="v num">${money0(spent)}</span></div>
       <div><span class="k">Seuil</span><span class="v num">${money0(p.amount)}</span></div>
       <div><span class="k">${left >= 0 ? 'Reste' : 'Dépassé'}</span><span class="v num" style="color:${left >= 0 ? 'var(--ok)' : 'var(--bad)'}">${money0(Math.abs(left))}</span></div>
-    </div><div class="note">Du ${esc(shortDate(p.start, true))} au ${esc(shortDate(p.end, true))}.${rs.total ? ` Réservé : ${money0(rs.total)}${rs.debt ? ' pour les dettes' : ''}${rs.debt && rs.save ? ' et' : ''}${rs.save ? ' pour l\'épargne' : ''}.` : ''}</div></div>
+    </div><div class="note">Du ${esc(shortDate(p.start, true))} au ${esc(shortDate(p.end, true))}.${rs.total ? ` Réservé : ${money0(rs.total)} (${[rs.debt ? 'dettes' : '', rs.save ? 'épargne' : '', rs.wish ? 'souhaits' : ''].filter(Boolean).join(', ')}).` : ''}${p.envIn ? ` ${money0(p.envIn)} versés dans tes enveloppes de souhaits.` : ''}</div></div>
     <form class="form" id="rvForm">
       ${s.profile ? `<label>Paie reçue pour cette période ($)<input class="field num" id="rvPay" inputmode="decimal" value="${esc(toInputMoney(p.paid ?? s.profile.pay))}"></label>
       <div class="note">Change-la si ta paie était différente : l'indice de confiance s'en sert.</div>` : ''}
@@ -2839,8 +2904,31 @@ function showTab(tab) {
   rerender();
   window.scrollTo(0, 0);
 }
+// When a period ends, what it kept for the wishes goes into their envelopes (the money itself stays in the pay account):
+// dated wishes get their reserve (less if the period overspent into it); then the leftover, or the fixed amount, fills the
+// wishes without a date in list order, unless it goes to the debts first.
+function fillEnvelopes() {
+  const s = S.settings, today = todayISO();
+  let changed = false;
+  for (const p of s.periods.slice().sort((a, b) => a.start.localeCompare(b.start))) {
+    if (p.end >= today || p.env || p.end < s.envFrom) continue;
+    p.env = true; changed = true;
+    if (!s.wishes.length) continue;
+    const rs = reserveFor(p);
+    let avail = p.amount - rs.debt - rs.save - spentC(itemsIn(p)), put = 0;
+    const k = rs.wish ? Math.max(0, Math.min(rs.wish, avail)) / rs.wish : 0;
+    for (const x of rs.wishes) { const w = s.wishes.find(y => y.id === x.id); if (w) { const a = Math.min(Math.round(x.amt * k), w.price - w.saved); w.saved += a; put += a; } }
+    avail -= rs.wish;
+    if (!(wishesWaitForDebts() && s.debts.some(d => d.bal > 0))) {
+      let pot = s.wishRate != null ? Math.round(s.wishRate * periodLen(p) / DAYS_MO) : Math.max(0, avail);
+      for (const w of s.wishes) { if (pot <= 0) break; if (w.by) continue; const a = Math.min(pot, w.price - w.saved); if (a > 0) { w.saved += a; pot -= a; put += a; } }
+    }
+    if (put) p.envIn = put;
+  }
+  return changed;
+}
 function rerender() {
-  if (rollPeriods()) persist('settings');
+  if (rollPeriods() | fillEnvelopes()) persist('settings');
   if (UI.tab === 'home') renderHome();
   else if (UI.tab === 'dash') renderDash();
   else if (UI.tab === 'future') renderFuture();
