@@ -149,6 +149,8 @@ body.kb .amount .cur { font-size: 7cqw; }
 .amount[data-l="xl"] .big { font-size: 12.5cqw; }
 .amount .cur { font-size: 9cqw; font-weight: 700; color: var(--muted); }
 .dial-n { font-size: 5.4cqw; font-weight: 700; min-height: 1.3em; text-align: center; white-space: nowrap; }
+.dial-n .gain { display: block; margin: 2px auto 0; border: 0; background: none; padding: 0; font: inherit; font-size: .78em; color: var(--c-debt); font-weight: 800; }
+body.kb .dial-n .gain { display: none; }
 .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; font-size: 12.5px; font-weight: 700; color: var(--muted); border: 0; background: transparent; width: 100%; padding: 0; }
 .legend[hidden] { display: none; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
@@ -574,7 +576,7 @@ function dateLabel(ts) {
 // debts: [{id, bal (cents), apr (%), min (cents)}], budget in cents, method 'avalanche' | 'snowball'.
 // Each month: interest accrues, minimums are paid, the rest of the budget goes to the priority debt.
 // A debt's month index k means it is paid off k months after the current month.
-function simulate(debts, budgetC, method) {
+function simulate(debts, budgetC, method, lumpC) {
   const ds = debts.filter(d => d.bal > 0).map(d => ({ id: d.id, bal: d.bal / 100, r: (d.apr || 0) / 1200, apr: d.apr || 0, min: (d.min || 0) / 100, payoff: null, interest: 0 }));
   const sumMin = Math.round(ds.reduce((s, d) => s + d.min, 0) * 100);
   const res = { months: 0, payoff: {}, interest: 0, sumMin, priority: null, never: false, short: budgetC < sumMin };
@@ -584,7 +586,11 @@ function simulate(debts, budgetC, method) {
     : (a, b) => (b.apr - a.apr) || (a.bal - b.bal));
   res.priority = order()[0].id;
   const budget = Math.max(budgetC, 0) / 100;
-  let m = 0, total = 0;
+  // A one-time amount paid now (e.g. this period's leftover) goes to the debts in priority order.
+  let lump = Math.max(lumpC || 0, 0) / 100;
+  for (const d of order()) { if (lump <= 0.004) break; const p = Math.min(d.bal, lump); d.bal -= p; lump -= p; }
+  for (const d of ds) if (d.bal <= 0.004) { d.payoff = 0; d.bal = 0; }
+  let m = 0, total = 0, lastPaid = 0;
   while (ds.some(d => d.bal > 0.004) && m < 600) {
     m++;
     for (const d of ds) if (d.bal > 0.004) { const i = d.bal * d.r; d.bal += i; d.interest += i; total += i; }
@@ -592,11 +598,14 @@ function simulate(debts, budgetC, method) {
     for (const d of ds) if (d.bal > 0.004) { const p = Math.min(d.min, d.bal, avail); d.bal -= p; avail -= p; }
     for (const d of order()) { if (avail <= 0.004) break; const p = Math.min(d.bal, avail); d.bal -= p; avail -= p; }
     for (const d of ds) if (d.payoff == null && d.bal <= 0.004) { d.payoff = m; d.bal = 0; }
+    lastPaid = budget - avail;
   }
   for (const d of ds) res.payoff[d.id] = d.payoff;
   res.interest = Math.round(total * 100);
   res.never = ds.some(d => d.payoff == null);
   res.months = res.never ? null : m;
+  // Exact length: the last month only counts for the share of the budget it used.
+  res.exact = res.never ? null : m ? m - 1 + (budget > 0 ? lastPaid / budget : 1) : 0;
   return res;
 }
 // Single debt, closed form: n = -ln(1 - rB/P) / ln(1 + r)
@@ -939,7 +948,7 @@ function reserveFor(p) {
   const spanTo = (by) => Math.max(L, daysBetween(p.start, by) + 1);
   const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
   let debt = 0;
-  if (s.debtReserve && bal > 0 && !(s.debtSince && p.end < s.debtSince)) {
+  if (s.debtReserve && !s.profile && bal > 0 && !(s.debtSince && p.end < s.debtSince)) {
     if (s.debtBudget > 0) debt = s.debtBudget * L / DAYS_MO;
     debt = Math.min(Math.round(debt), bal);
   }
@@ -959,6 +968,18 @@ function leftoverExtra() {
   if (!s.leftoverToDebt) return 0;
   const a = autoLeftover();
   return a && a.monthly > 0 ? a.monthly : 0;
+}
+// This period's leftover so far, if it is kept and goes to the debts: debt down by that much, debt-free N days sooner
+// (compared with the monthly budget alone).
+function leftoverGain() {
+  const s = S.settings, h = UI.hs || homeState();
+  if (!s.leftoverToDebt || !h || !h.per || h.left <= 0 || s.debtBudget <= 0) return null;
+  const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
+  if (bal <= 0) return null;
+  const amt = Math.min(h.left, bal), a = simulate(s.debts, s.debtBudget, s.method), b = simulate(s.debts, s.debtBudget, s.method, amt);
+  if (a.exact == null || b.exact == null || a.short) return null;
+  const to = s.debts.find(d => d.id === a.priority);
+  return { amt, days: Math.max(0, Math.round((a.exact - b.exact) * DAYS_MO)), interest: Math.max(0, a.interest - b.interest), to: to ? to.name : '', end: h.per.end };
 }
 function debtSim(budget) {
   const s = S.settings;
@@ -1400,7 +1421,11 @@ function renderRing() {
     else if (e > 0) {
       const after = h.left - e;
       note = after >= 0 ? `<span style="color:${h.free > 0 && h.spent + e >= .8 * h.free ? 'var(--warn)' : 'var(--ok)'}">→ reste ${money(after)}</span>` : `<span style="color:var(--bad)">→ dépasse de ${money(-after)}</span>`;
-    } else note = `<span class="muted">reste ${money((nativeOn() ? UI.barView : UI.ringView) == null ? h.left : h.left + h.spent - Math.round(nativeOn() ? UI.barView : UI.ringView))}</span>`;
+    } else {
+      const g = leftoverGain();
+      note = `<span class="muted">reste ${money((nativeOn() ? UI.barView : UI.ringView) == null ? h.left : h.left + h.spent - Math.round(nativeOn() ? UI.barView : UI.ringView))}</span>`
+        + (g && g.days > 0 ? `<button type="button" class="gain" data-act="tab" data-tab="debts">${g.days} j de dettes en moins</button>` : '');
+    }
     label = `${Math.round(h.spent / A * 100)} % du seuil dépensé${rs.total ? ', ' + Math.round(rs.total / A * 100) + ' % réservé' : ''}`;
   } else {
     note = `<span class="muted">${esc(h.label)} : ${money0(h.spent)}</span>`; label = 'Aucune période définie';
@@ -1794,16 +1819,17 @@ function confLine(c, id) {
    real spending), minus the savings share (to the savings account) and the debt payments actually made
    (debts simulated with the repayment budget, interest included). Other accounts stay as they are.
    The 80 % band (±1.28 σ √pays) sits on the pay account and on net worth. */
-function debtPath(months) {
+function debtPath(months, extraC) {
   const s = S.settings, ds = s.debts.filter(d => d.bal > 0).map(d => ({ bal: d.bal / 100, r: (d.apr || 0) / 1200, apr: d.apr || 0, min: (d.min || 0) / 100 }));
   const bal = [Math.round(ds.reduce((a, d) => a + d.bal, 0) * 100)], paid = [0];
   const order = () => ds.filter(d => d.bal > .004).sort(s.method === 'snowball' ? (a, b) => a.bal - b.bal : (a, b) => b.apr - a.apr);
   for (let m = 1; m <= months; m++) {
-    let avail = s.debtBudget / 100;
+    const budget = (s.debtBudget + (extraC || 0)) / 100;
+    let avail = budget;
     for (const d of ds) if (d.bal > .004) d.bal += d.bal * d.r;
     for (const d of ds) if (d.bal > .004) { const p = Math.min(d.min, d.bal, avail); d.bal -= p; avail -= p; }
     for (const d of order()) { if (avail <= .004) break; const p = Math.min(d.bal, avail); d.bal -= p; avail -= p; }
-    paid.push(Math.round((s.debtBudget / 100 - avail) * 100)); bal.push(Math.round(ds.reduce((a, d) => a + Math.max(0, d.bal), 0) * 100));
+    paid.push(Math.round((budget - avail) * 100)); bal.push(Math.round(ds.reduce((a, d) => a + Math.max(0, d.bal), 0) * 100));
   }
   return { bal, paid };
 }
@@ -1816,7 +1842,7 @@ function projection() {
   const sig = hist ? c.sig : pf.pay * (pf.variable ? .15 : .08) * Math.SQRT2;
   const payA = s.accounts.find(a => a.id === pf.payAcc) || s.accounts.find(a => a.kind === 'cheque') || s.accounts[0];
   const saveA = s.accounts.find(a => a.id === pf.saveAcc && a.id !== payA.id) || s.accounts.find(a => a.kind === 'epargne' && a.id !== payA.id) || null;
-  const dp = debtPath(12), M = [...Array(13).keys()];
+  const dp = debtPath(12, leftoverExtra()), M = [...Array(13).keys()];
   let paidCum = 0;
   const series = s.accounts.map(a => ({ id: a.id, name: a.name, kind: a.kind, pay: a.id === payA.id, v: M.map(() => a.bal) }));
   const sp = series.find(x => x.pay), ss = saveA ? series.find(x => x.id === saveA.id) : null;
@@ -1940,8 +1966,8 @@ function renderDebts() {
     </div>
     <div class="note" id="budgetNote">${budgetNoteText(s.debtBudget, sumMin)}</div>
     <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="leftoverToggle" ${s.leftoverToDebt ? 'checked' : ''}>Ajouter le reste de chaque période sous le seuil</label>
-    <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="dDebtOn" ${s.debtReserve ? 'checked' : ''}>Prendre ce budget dans mon seuil de dépenses</label>
-    <div class="note">${s.debtReserve ? (s.debtBudget > 0 ? `${money0(s.debtBudget)} par mois sont mis de côté sur ton seuil, au prorata de chaque période.` : 'Indique un budget pour qu\'il soit mis de côté sur ton seuil.') : 'Le remboursement est payé à part, ton seuil reste entier.'}</div>
+    ${s.profile ? `<div class="note">${profileDebtNote()}</div>` : `<label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="dDebtOn" ${s.debtReserve ? 'checked' : ''}>Prendre ce budget dans mon seuil de dépenses</label>
+    <div class="note">${s.debtReserve ? (s.debtBudget > 0 ? `${money0(s.debtBudget)} par mois sont mis de côté sur ton seuil, au prorata de chaque période.` : 'Indique un budget pour qu\'il soit mis de côté sur ton seuil.') : 'Le remboursement est payé à part, ton seuil reste entier.'}</div>`}
     ${sim.short ? `<div class="warntext">Le budget est sous la somme des minimums (${money(sumMin)}).</div>` : ''}
     ${sim.never && !sim.short ? `<div class="warntext">À ce budget, au moins une dette ne sera jamais remboursée.</div>` : ''}
     <div class="seg" role="group" aria-label="Méthode">
@@ -1950,6 +1976,7 @@ function renderDebts() {
     </div>
     <div class="note">${s.method === 'snowball' ? "L'extra va au plus petit solde. Plus de victoires rapides, un peu plus d'intérêts." : "L'extra va au taux le plus élevé. Le moins d'intérêts au total."}</div>
   </div>
+  ${active.length ? leftoverCard() : ''}
   ${active.length ? debtByCard(sim) : ''}`;
   const ordered = [...active].sort((a, b) => (sim.payoff[a.id] ?? 1e9) - (sim.payoff[b.id] ?? 1e9));
   body += `<ul class="list stack" id="debtList">${[...ordered, ...paid].map(d => {
@@ -1980,6 +2007,27 @@ function debtByCard(sim) {
   return `<div class="card"><label class="form" style="display:flex;flex-direction:column;gap:4px"><h2>Libre de dettes d'ici</h2>
     <input class="field" id="dDebtBy" type="date" value="${esc(by || '')}"></label>
     <div class="note">${esc(note)}</div>${cl ? `<div class="note" style="display:flex">${cl}</div>` : ''}${btn}</div>`;
+}
+// With a profile, the debt share is taken from each pay before the threshold: nothing more to set aside.
+function profileDebtNote() {
+  const s = S.settings, pf = s.profile, pm = perMonth(pf.debt, pf.freq);
+  if (!pf.debt) return 'Ton profil ne prévoit pas de part pour les dettes : ce budget est payé à part, ton seuil reste entier.';
+  let t = `Pris sur ta paie avant ton seuil : ${money0(pf.debt)} par paie (≈ ${money0(pm)}/mois), d'après ton profil. Ton seuil ne baisse pas une deuxième fois.`;
+  if (Math.abs(s.debtBudget - pm) >= 100) t += ` Ce budget diffère de ton profil : ajuste ta part dettes dans le profil pour que ton seuil suive.`;
+  return esc(t);
+}
+// What the leftover of the current period would do for the debts (only when "add the leftover" is on).
+function leftoverCard() {
+  const s = S.settings;
+  if (!s.leftoverToDebt) return '';
+  const g = leftoverGain(), h = UI.hs || homeState();
+  let t;
+  if (!h || !h.per) t = 'Définis une période et un seuil pour voir ce que ton reste rapporte.';
+  else if (h.left <= 0) t = `Rien sous ton seuil pour l'instant dans cette période (${esc(rangeLabel(h.per))}).`;
+  else if (!g) t = `Reste en cours : ${money0(h.left)}. Indique un budget de remboursement pour voir le gain.`;
+  else t = `<b class="num" style="font-size:22px">${g.days} jour${g.days > 1 ? 's' : ''} plus tôt</b><br>Si tu gardes ton reste de ${money0(g.amt)} jusqu'au ${esc(shortDate(g.end))}, il réduit ${g.to ? esc(g.to) : 'tes dettes'} de ${money0(g.amt)}${g.interest >= 100 ? ` et t'évite ${money0(g.interest)} d'intérêts` : ''}.`;
+  return `<div class="card"><h2>Ton reste en ce moment</h2><div class="note" style="color:var(--fg)">${t}</div>
+    <div class="note">Comparé à ton budget mensuel seul. À la fin de la période, rembourse ce montant sur ta carte et mets son solde à jour.</div></div>`;
 }
 function budgetNoteText(v, sumMin) {
   let t = `Minimums ${money0(sumMin)} + extra ${money0(Math.max(v - sumMin, 0))}`;
@@ -2357,7 +2405,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.24.1${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.25.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
