@@ -357,6 +357,8 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-radius: 999px; padding: 4px; gap: 4px; }
 .seg button { border: 0; background: transparent; border-radius: 999px; padding: 9px; font-weight: 700; font-size: 14px; color: var(--muted); }
 .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.seg.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.seg.five button { padding: 9px 2px; font-size: 13px; white-space: nowrap; }
 .range { width: 100%; accent-color: var(--accent); }
 .debt { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; width: 100%; text-align: left; background: transparent; border: 0; }
 .debt .l1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -632,7 +634,7 @@ function defaultSettings() {
     catsV: 3,
     debts: [], payments: [], debtBudget: 0, method: 'avalanche',
     wishes: [], wishCushion: 0, wishRate: null, wishAfterDebts: false,
-    leftoverToDebt: true, reviewed: {},
+    leftoverPct: 100, reviewed: {},
     alerts: {}, lastExport: null, theme: 'auto',
     people: [], settles: [], lastSplit: null, goals: [], debtReserve: false, debtGoalBy: null, debtSince: null, kb: 'native',
     profile: null, profileSkip: false, accounts: [], fx: true, haptic: 2, name: '', incomes: [], merchantCats: {},
@@ -683,7 +685,10 @@ function normalize(st) {
   const s = Object.assign(defaultSettings(), st || {});
   if (!Array.isArray(s.periods)) s.periods = [];
   if (!Array.isArray(s.wishes)) s.wishes = [];
-  if (typeof s.leftoverToDebt !== 'boolean') s.leftoverToDebt = true;
+  // v1.27: share of the leftover under the threshold that goes to the debts (was a yes/no box in Dettes).
+  if (st && st.leftoverPct === undefined && st.leftoverToDebt === false) s.leftoverPct = 0;
+  if (![0, 25, 50, 75, 100].includes(s.leftoverPct)) s.leftoverPct = 100;
+  delete s.leftoverToDebt;
   if (!s.reviewed || typeof s.reviewed !== 'object') s.reviewed = {};
   if (st && st.thresholds && Object.keys(st.thresholds).length && !s.periods.length) {
     const th = st.thresholds, cm = curMonth();
@@ -984,20 +989,21 @@ function reserveFor(p) {
   return { debt, goals, save, need, wishes, wish, total: debt + save + wish };
 }
 // Average monthly amount left under the threshold (finished periods), added to debt repayment when enabled.
+const debtShare = () => (S.settings.leftoverPct || 0) / 100;
 function leftoverExtra() {
-  const s = S.settings;
-  if (!s.leftoverToDebt) return 0;
+  const k = debtShare();
+  if (!k) return 0;
   const a = autoLeftover();
-  return a && a.monthly > 0 ? a.monthly : 0;
+  return a && a.monthly > 0 ? Math.round(a.monthly * k) : 0;
 }
 // This period's leftover so far, if it is kept and goes to the debts: debt down by that much, debt-free N days sooner
 // (compared with the monthly budget alone).
 function leftoverGain() {
   const s = S.settings, h = UI.hs || homeState();
-  if (!s.leftoverToDebt || !h || !h.per || h.left <= 0 || s.debtBudget <= 0) return null;
+  if (!debtShare() || !h || !h.per || h.left <= 0 || s.debtBudget <= 0) return null;
   const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
   if (bal <= 0) return null;
-  const amt = Math.min(h.left, bal), a = simulate(s.debts, s.debtBudget, s.method), b = simulate(s.debts, s.debtBudget, s.method, amt);
+  const amt = Math.min(Math.round(h.left * debtShare()), bal), a = simulate(s.debts, s.debtBudget, s.method), b = simulate(s.debts, s.debtBudget, s.method, amt);
   if (a.exact == null || b.exact == null || a.short) return null;
   const to = s.debts.find(d => d.id === a.priority);
   return { amt, days: Math.max(0, Math.round((a.exact - b.exact) * DAYS_MO)), interest: Math.max(0, a.interest - b.interest), to: to ? to.name : '', end: h.per.end };
@@ -1985,7 +1991,7 @@ function renderDebts() {
       <span class="muted" style="font-weight:600">$ / mois</span>
     </div>
     <div class="note" id="budgetNote">${budgetNoteText(s.debtBudget, sumMin)}</div>
-    <label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="leftoverToggle" ${s.leftoverToDebt ? 'checked' : ''}>Ajouter le reste de chaque période sous le seuil</label>
+    <div class="note">Reste sous le seuil : ${s.leftoverPct ? `${s.leftoverPct} % aux dettes` : 'rien aux dettes'}. <button class="link" data-act="open-set" data-s="profil" style="padding:0">Modifier dans Réglages</button></div>
     ${s.profile ? `<div class="note">${profileDebtNote()}</div>` : `<label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="dDebtOn" ${s.debtReserve ? 'checked' : ''}>Prendre ce budget dans mon seuil de dépenses</label>
     <div class="note">${s.debtReserve ? (s.debtBudget > 0 ? `${money0(s.debtBudget)} par mois sont mis de côté sur ton seuil, au prorata de chaque période.` : 'Indique un budget pour qu\'il soit mis de côté sur ton seuil.') : 'Le remboursement est payé à part, ton seuil reste entier.'}</div>`}
     ${sim.short ? `<div class="warntext">Le budget est sous la somme des minimums (${money(sumMin)}).</div>` : ''}
@@ -2009,7 +2015,7 @@ function renderDebts() {
       ${interestOnly ? `<span class="warnline">Le minimum ne couvre pas les intérêts (${money(Math.ceil(d.bal * d.apr / 1200))}/mois).</span>` : ''}
     </button></li>`;
   }).join('')}</ul>
-  <p class="note">Les dates supposent que le budget mensuel${s.leftoverToDebt ? ', plus le reste moyen sous ton seuil,' : ''} est payé chaque mois. Quand une dette est soldée, son paiement passe à la suivante.${lastUpd ? ' Soldes mis à jour le ' + esc(shortDate(lastUpd, true)) + '.' : ''}</p>`;
+  <p class="note">Les dates supposent que le budget mensuel${s.leftoverPct ? `, plus ${s.leftoverPct === 100 ? 'le' : s.leftoverPct + ' % du'} reste moyen sous ton seuil,` : ''} est payé chaque mois. Quand une dette est soldée, son paiement passe à la suivante.${lastUpd ? ' Soldes mis à jour le ' + esc(shortDate(lastUpd, true)) + '.' : ''}</p>`;
   $('#v-debts').innerHTML = body;
 }
 // Optional "debt-free by" date: shows the monthly budget it takes, interest included.
@@ -2039,21 +2045,21 @@ function profileDebtNote() {
 // What the leftover of the current period would do for the debts (only when "add the leftover" is on).
 function leftoverCard() {
   const s = S.settings;
-  if (!s.leftoverToDebt) return '';
+  if (!debtShare()) return '';
   const g = leftoverGain(), h = UI.hs || homeState();
   let t;
   if (!h || !h.per) t = 'Définis une période et un seuil pour voir ce que ton reste rapporte.';
   else if (h.left <= 0) t = `Rien sous ton seuil pour l'instant dans cette période (${esc(rangeLabel(h.per))}).`;
   else if (!g) t = `Reste en cours : ${money0(h.left)}. Indique un budget de remboursement pour voir le gain.`;
-  else t = `<b class="num" style="font-size:22px">${g.days} jour${g.days > 1 ? 's' : ''} plus tôt</b><br>Si tu gardes ton reste de ${money0(g.amt)} jusqu'au ${esc(shortDate(g.end))}, il réduit ${g.to ? esc(g.to) : 'tes dettes'} de ${money0(g.amt)}${g.interest >= 100 ? ` et t'évite ${money0(g.interest)} d'intérêts` : ''}.`;
+  else t = `<b class="num" style="font-size:22px">${g.days} jour${g.days > 1 ? 's' : ''} plus tôt</b><br>Si tu gardes ${s.leftoverPct < 100 ? `${s.leftoverPct} % de ton reste (` + money0(g.amt) + ')' : 'ton reste de ' + money0(g.amt)} jusqu'au ${esc(shortDate(g.end))}, il réduit ${g.to ? esc(g.to) : 'tes dettes'} de ${money0(g.amt)}${g.interest >= 100 ? ` et t'évite ${money0(g.interest)} d'intérêts` : ''}.`;
   return `<div class="card"><h2>Ton reste en ce moment</h2><div class="note" style="color:var(--fg)">${t}</div>
     <div class="note">Comparé à ton budget mensuel seul. À la fin de la période, rembourse ce montant sur ta carte et mets son solde à jour.</div></div>`;
 }
 function budgetNoteText(v, sumMin) {
   let t = `Minimums ${money0(sumMin)} + extra ${money0(Math.max(v - sumMin, 0))}`;
-  if (S.settings.leftoverToDebt) {
-    const a = autoLeftover();
-    t += a ? (a.monthly > 0 ? ` + reste moyen du budget ≈ ${money0(a.monthly)}/mois` : ' · aucun reste sous le seuil ces dernières périodes')
+  if (debtShare()) {
+    const a = autoLeftover(), k = debtShare();
+    t += a ? (a.monthly > 0 ? ` + ${k < 1 ? S.settings.leftoverPct + ' % du ' : ''}reste moyen ≈ ${money0(Math.round(a.monthly * k))}/mois` : ' · aucun reste sous le seuil ces dernières périodes')
       : ' · le reste sous le seuil comptera dès ta première période terminée';
   }
   return t;
@@ -2185,16 +2191,28 @@ function savingRate() {
   return Object.assign({ source: 'auto' }, a);
 }
 // While debts remain and the leftover goes to them, the estimated savings only start after the debts.
-const wishesWaitForDebts = () => { const s = S.settings; return s.wishAfterDebts || (s.leftoverToDebt && s.wishRate == null); };
+const wishesWaitForDebts = () => { const s = S.settings; return s.wishAfterDebts || (s.leftoverPct === 100 && s.wishRate == null); };
+// Share of the estimated leftover the undated wishes get while debts remain (the rest goes to the debts).
+const wishPart = () => { const s = S.settings; return s.wishRate == null && s.debts.some(d => d.bal > 0) ? 1 - debtShare() : 1; };
 // Wishes are funded in list order: each one waits for the ones above it.
 function wishPlan() {
   const s = S.settings, r = savingRate();
   const hasDebt = s.debts.some(d => d.bal > 0);
-  let startDay = todayISO(), debtMonths;
-  if (wishesWaitForDebts() && hasDebt) {
+  let startDay = todayISO(), debtMonths, debtEnd = null;
+  const part = wishPart();
+  if ((wishesWaitForDebts() || part < 1) && hasDebt) {
     debtMonths = debtSim().months;
-    if (debtMonths != null) { const d = parseMonth(addMonths(curMonth(), debtMonths)); startDay = isoOf(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
+    if (debtMonths != null) { const d = parseMonth(addMonths(curMonth(), debtMonths)); debtEnd = isoOf(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
+    if (wishesWaitForDebts() && debtEnd) startDay = debtEnd;
   }
+  // Partial share: a smaller rate until the debts are paid, the full rate after.
+  const whenFor = (need) => {
+    if (wishesWaitForDebts() || part >= 1) return addDays(startDay, Math.ceil(need / r.perDay));
+    if (part <= 0 && !debtEnd) return null;
+    const d1 = debtEnd ? Math.max(0, daysBetween(todayISO(), debtEnd)) : Infinity, acc = r.perDay * part * d1;
+    if (need <= acc) return addDays(todayISO(), Math.ceil(need / (r.perDay * part)));
+    return addDays(debtEnd, Math.ceil((need - acc) / r.perDay));
+  };
   const per = activePeriod(), rs = per ? reserveFor(per) : null;
   let cum = 0;
   const rows = s.wishes.map(w => {
@@ -2206,7 +2224,7 @@ function wishPlan() {
     if (wishesWaitForDebts() && hasDebt && debtMonths == null) state = 'never';
     else if (r.source === 'none') state = 'unknown';
     else if (!(r.perDay > 0)) state = 'never';
-    else { when = addDays(startDay, Math.ceil(cum / r.perDay)); state = 'date'; }
+    else { when = whenFor(cum); state = when ? 'date' : 'never'; }
     return { w, rem, cur, when, state };
   });
   return { r, rows, hasDebt, debtMonths, per };
@@ -2230,6 +2248,7 @@ function renderWishes() {
     src = `Ce qui est resté sous ton seuil, en moyenne sur ${r.n === 1 ? 'ta dernière période terminée' : 'tes ' + r.n + ' dernières périodes terminées'}.`;
     if (r.monthly <= 0) warn = `<div class="warntext">Tes dernières périodes ont dépassé le seuil : rien n'est mis de côté à ce rythme.</div>`;
   } else { rateV = '—'; src = "L'estimation commence après ta première période terminée. En attendant, tu peux indiquer un montant fixe."; }
+  if (hasDebt && !wishesWaitForDebts() && wishPart() < 1 && r.source === 'auto') src += ` ${s.leftoverPct} % du reste va aux dettes tant qu'il y en a : tes souhaits sans date reçoivent ≈ ${money0(Math.max(0, r.monthly) * wishPart())}/mois d'ici là.`;
   if (wishesWaitForDebts() && hasDebt) src += ' ' + (!s.wishAfterDebts ? 'Le reste va d\'abord aux dettes : ' : '') + (debtMonths != null ? `les souhaits sans date commencent après la fin des dettes (${payoffLabel(debtMonths)}).` : 'les souhaits sans date attendent la fin des dettes, qui ne se termine pas au budget actuel.');
   head += `<div class="card rate hero">
     <h2>Dans tes enveloppes</h2>
@@ -2356,7 +2375,7 @@ function sheetWishSettings() {
       <div class="note" id="wsAutoNote" ${st.fixed ? 'hidden' : ''}>Moyenne de ce qui reste sous ton seuil sur tes dernières périodes terminées${autoS ? ' : ' + esc(autoS) : ''}.</div>
       <label id="wsFixedL" ${st.fixed ? '' : 'hidden'}>Montant mis de côté par mois ($)<input class="field num" id="wsFixed" inputmode="decimal" value="${s.wishRate != null ? esc(toInputMoney(s.wishRate)) : ''}"></label>
       <label class="chk" style="flex-direction:row;font-size:14px;color:var(--fg)"><input type="checkbox" id="wsDebt" ${s.wishAfterDebts ? 'checked' : ''}>Commencer après la libération des dettes</label>
-      ${s.leftoverToDebt && s.debts.some(d => d.bal > 0) ? '<div class="note">Le reste de ton budget va aux dettes (onglet Dettes). Avec l\'estimation, tes souhaits attendent donc la fin des dettes. Un montant fixe, lui, est mis de côté à part.</div>' : ''}
+      ${s.leftoverPct && s.debts.some(d => d.bal > 0) ? `<div class="note">${s.leftoverPct} % de ton reste va aux dettes (Réglages › Profil). Avec l'estimation, tes souhaits sans date reçoivent le reste${s.leftoverPct === 100 ? ', donc attendent la fin des dettes' : ''}. Un montant fixe, lui, est mis de côté à part.</div>` : ''}
       <div class="note">Les souhaits avec une date cible ont leur propre réserve sur ton seuil.</div>
       <div class="warntext" id="wsErr" hidden></div>
       <button class="btn block" type="submit">Enregistrer</button>
@@ -2462,7 +2481,12 @@ function renderSettings() {
         : '<div class="note">Dans Chrome : menu ⋮ › Installer l\'application (ou Ajouter à l\'écran d\'accueil). L\'icône ouvrira directement la saisie, même hors ligne.</div>'}
     </div>`,
   };
-  sec.profil += `<div class="card"><h2>Ton prénom</h2><input class="field" id="meName" maxlength="24" value="${esc(s.name || '')}" placeholder="Affiché sur ta pastille" autocomplete="given-name"></div>`
+  const la = autoLeftover(), lm = la && la.monthly > 0 ? la.monthly : 0, hasDebt = s.debts.some(d => d.bal > 0);
+  sec.profil += `<div class="card"><h2>Ce qui reste sous ton seuil</h2>
+      <div class="note">À la fin de chaque période, la part de ton reste qui va aux dettes. Le reste remplit tes souhaits sans date.</div>
+      <div class="seg five" role="group" aria-label="Part du reste aux dettes">${[0, 25, 50, 75, 100].map(v => `<button data-act="leftover-pct" data-v="${v}" aria-pressed="${s.leftoverPct === v}">${v} %</button>`).join('')}</div>
+      <div class="note">${!hasDebt ? 'Aucune dette en cours : tout ton reste va à tes souhaits.' : lm ? `Ton reste moyen ≈ ${money0(lm)}/mois : ≈ ${money0(lm * debtShare())} aux dettes, ≈ ${money0(lm * (1 - debtShare()))} aux souhaits sans date.` : 'Le partage s\'appliquera dès ta première période terminée sous le seuil.'}${hasDebt && s.leftoverPct ? ' Les dettes coûtent souvent plus en intérêts que ce que l\'épargne rapporte.' : ''}</div></div>`
+    + `<div class="card"><h2>Ton prénom</h2><input class="field" id="meName" maxlength="24" value="${esc(s.name || '')}" placeholder="Affiché sur ta pastille" autocomplete="given-name"></div>`
     + (s.accounts.length ? `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Mes comptes</h2><button class="btn ghost" data-act="pf-open" data-step="2">Modifier</button></div>
       ${s.accounts.map(a => `<div class="dline"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span></div>`).join('')}</div>` : '');
   const cur = SET_SECS.some(x => x[0] === UI.setSec) ? UI.setSec : 'profil';
@@ -2472,7 +2496,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.26.1${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.27.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -2922,7 +2946,7 @@ function fillEnvelopes() {
     for (const x of rs.wishes) { const w = s.wishes.find(y => y.id === x.id); if (w) { const a = Math.min(Math.round(x.amt * k), w.price - w.saved); w.saved += a; put += a; } }
     avail -= rs.wish;
     if (!(wishesWaitForDebts() && s.debts.some(d => d.bal > 0))) {
-      let pot = s.wishRate != null ? Math.round(s.wishRate * periodLen(p) / DAYS_MO) : Math.max(0, avail);
+      let pot = s.wishRate != null ? Math.round(s.wishRate * periodLen(p) / DAYS_MO) : Math.round(Math.max(0, avail) * wishPart());
       for (const w of s.wishes) { if (pot <= 0) break; if (w.by) continue; const a = Math.min(pot, w.price - w.saved); if (a > 0) { w.saved += a; pot -= a; put += a; } }
     }
     if (put) p.envIn = put;
@@ -3042,6 +3066,8 @@ document.addEventListener('click', (e) => {
     case 'pay-test': NP.PayNotif.simulate({}).then((r) => { toast(r && r.kept ? 'Exemple ajouté : regarde la notification et le bandeau' : 'Exemple déjà reçu il y a moins de 3 min'); loadDetected(); }); break;
     case 'card-pay': sheetCardPay(t.dataset.id); break;
     case 'set-sec': UI.setSec = t.dataset.s; renderSettings(); window.scrollTo(0, 0); break;
+    case 'open-set': UI.setSec = t.dataset.s; showTab('settings'); break;
+    case 'leftover-pct': S.settings.leftoverPct = +t.dataset.v; persist('settings'); buzz('tile'); renderSettings(); break;
     case 'goal-new': sheetGoal(null); break;
     case 'debt-use-need': S.settings.debtBudget = +t.dataset.v; persist('settings'); toast('Budget de remboursement mis à jour'); rerender(); break;
     case 'goal-edit': sheetGoal(t.dataset.id); break;
@@ -3087,7 +3113,6 @@ document.addEventListener('change', (e) => {
   }
   if (el.id === 'meName') { s.name = el.value.trim().slice(0, 24); persist('settings'); renderSettings(); return; }
   if (el.id === 'fxToggle') { s.fx = el.checked; document.body.classList.toggle('nofx', !s.fx); persist('settings'); if (s.fx) buzz('hit'); renderSettings(); return; }
-  if (el.id === 'leftoverToggle') { s.leftoverToDebt = el.checked; persist('settings'); renderDebts(); return; }
   if (el.id === 'dDebtOn') { s.debtReserve = el.checked; if (el.checked) s.debtSince = todayISO(); persist('settings'); rerender(); return; }
   if (el.id === 'dDebtBy') { s.debtGoalBy = el.value && el.value > todayISO() ? el.value : null; persist('settings'); rerender(); return; }
   if (!f) return;
