@@ -392,6 +392,8 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 .wish .w-when.now b { background: #0E6B38; }
 .wish .w-when.never b { background: #B3261E; }
 .wish .w-when.late b { background: #B3261E; }
+.confetti { position: fixed; inset: 0; pointer-events: none; z-index: 200; overflow: hidden; }
+.confetti i { position: absolute; top: 0; display: block; }
 .wish .w-env { font-size: 13px; color: var(--muted); font-weight: 600; }
 .wish .meter { width: 100%; margin-top: 2px; }
 .wish .w-side { display: flex; align-items: center; gap: 2px; }
@@ -2470,7 +2472,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.26.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.26.1${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -2927,8 +2929,36 @@ function fillEnvelopes() {
   }
   return changed;
 }
+// Confetti burst from the top of the screen (skipped when effects or motion are off).
+function confetti() {
+  if (!motionOK()) return;
+  const box = document.createElement('div'); box.className = 'confetti'; box.setAttribute('aria-hidden', 'true');
+  const cols = ['#2B47D9', '#F5A300', '#E5372B', '#12A150', '#8B3DFF', '#FF4FA3', '#00A3D9'], W = innerWidth, H = innerHeight;
+  for (let i = 0; i < 90; i++) {
+    const c = document.createElement('i'), x0 = W / 2 + (Math.random() - .5) * W * .3, dx = (Math.random() - .5) * W * 1.1, dur = 1300 + Math.random() * 900;
+    c.style.cssText = `left:${x0}px;background:${cols[i % cols.length]};width:${6 + Math.random() * 6}px;height:${8 + Math.random() * 8}px;border-radius:${Math.random() < .3 ? '50%' : '2px'}`;
+    box.appendChild(c);
+    c.animate([{ transform: 'translate(0,-20px) rotate(0)', opacity: 1 },
+      { transform: `translate(${dx * .6}px,${H * .35}px) rotate(${360 + Math.random() * 360}deg)`, opacity: 1, offset: .45 },
+      { transform: `translate(${dx}px,${H + 40}px) rotate(${720 + Math.random() * 720}deg)`, opacity: .8 }],
+      { duration: dur, delay: Math.random() * 250, easing: 'cubic-bezier(.2,.6,.4,1)', fill: 'both' });
+  }
+  document.body.appendChild(box); setTimeout(() => box.remove(), 2600);
+}
+// A wish's envelope just became full (period end, edit, restore): celebrate once.
+function checkFull() {
+  const s = S.settings, full = [];
+  for (const w of s.wishes) {
+    if (w.price > 0 && (w.saved || 0) >= w.price) { if (!w.fullAt) { w.fullAt = todayISO(); full.push(w.name); } }
+    else if (w.fullAt) delete w.fullAt;
+  }
+  if (!full.length) return;
+  persist('settings');
+  setTimeout(() => { confetti(); if (NATIVE || (navigator.userActivation && navigator.userActivation.hasBeenActive)) buzz('hit'); toast(`Enveloppe pleine : ${full.join(', ')}. Tu peux l'acheter !`); }, 350);
+}
 function rerender() {
   if (rollPeriods() | fillEnvelopes()) persist('settings');
+  checkFull();
   if (UI.tab === 'home') renderHome();
   else if (UI.tab === 'dash') renderDash();
   else if (UI.tab === 'future') renderFuture();
