@@ -150,6 +150,8 @@ body.kb .amount .cur { font-size: 7cqw; }
 .amount .cur { font-size: 9cqw; font-weight: 700; color: var(--muted); }
 .dial-n { font-size: 17px; font-weight: 700; min-height: 1.35em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: -2px; }
 .dial-n b { color: var(--fg); font-weight: 800; }
+.dial-n { cursor: pointer; }
+.dial-n .ii { display: inline-grid; place-items: center; width: 17px; height: 17px; margin-left: 7px; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent); font: 800 11px/1 var(--f-ui); font-style: normal; vertical-align: 2px; }
 .dial-n .bad { color: var(--bad); }
 .dial-k:empty { display: none; }
 .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; }
@@ -491,7 +493,7 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
       <button class="kb-x" id="kbClose" data-act="kb-close" type="button" aria-label="Fermer le clavier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       <div class="hbar" id="hbar" aria-hidden="true"><i id="hb-de"></i><i id="hb-wi"></i><i id="hb-sa"></i><i id="hb-sp"></i><i id="hb-gh"></i><b id="hb-pc"></b></div>
     </div>
-    <div class="dial-n" id="dialN" aria-live="polite"></div>
+    <div class="dial-n" id="dialN" data-act="pace-info" role="button" tabindex="0" aria-live="polite"></div>
     <div class="legend" id="legend" role="group" aria-label="Détailler la partie noire" hidden></div>
     <button class="gainpill" id="gainPill" hidden></button>
     <div class="stats3" id="stats3"></div>
@@ -1493,7 +1495,7 @@ function renderRing() {
     } else {
       const v = nativeOn() ? UI.barView : UI.ringView, left = v == null ? h.left : h.left + h.spent - Math.round(v);
       note = `<span class="${left < 0 ? 'bad' : 'muted'}">${left < 0 ? 'dépassé de ' + money0(-left) : 'reste <b>' + money0(left) + '</b>'}</span>`
-        + (left > 0 && h.daysLeft > 0 ? `<span class="muted"> · ${money0(left / h.daysLeft)}/jour</span>` : '');
+        + (left > 0 && h.daysLeft > 0 ? `<span class="muted"> · ${money0(left / h.daysLeft)}/jour</span>` : '') + (h.pace != null ? '<i class="ii" aria-label="Rythme">i</i>' : '');
     }
     label = `${Math.round(end / 1 * 100)} % de la période pris : ${money0(h.spent)} dépensés${end * A - h.spent > 50 ? `, ${money0(end * A - (UI.ringView ?? h.spent))} pour dettes, souhaits et épargne` : ''}`;
   } else {
@@ -2538,7 +2540,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.29.1${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.29.2${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -3083,6 +3085,7 @@ document.addEventListener('click', (e) => {
     case 'person-new': sheetPerson(); break;
     case 'share-open': sheetShare(t.dataset.id); break;
     case 'goals': showTab('goals'); break;
+    case 'pace-info': if (!nativeOn() && !amtCents()) window.showPace(t); break;
     case 'ring-show': { const k = t.dataset.part, sh = S.settings.ringShow; sh[k] = !sh[k]; persist('settings'); buzz('tile'); renderSummary(); break; }
     case 'haptic': S.settings.haptic = +t.dataset.v; persist('settings'); buzz('hit'); renderSettings(); break;
     case 'haptic-test': {
@@ -3189,14 +3192,17 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) rere
 (function paceHint() {
   let timer = null, sx = 0, sy = 0, hideT = null;
   const bubble = document.createElement('div'); bubble.className = 'pace-bubble'; bubble.hidden = true; document.body.appendChild(bubble);
-  const show = () => {
+  const show = (anchor) => {
     const h = UI.hs; if (!h || !h.per || h.pace == null) return;
-    const d = h.pace - h.spent, r = $('#dial').getBoundingClientRect();
+    const d = h.pace - h.spent, r = (anchor || $('#dial')).getBoundingClientRect();
     bubble.innerHTML = `<b>Rythme : ${money0(h.pace)} aujourd'hui</b>${Math.abs(d) < 100 ? 'Tu es pile dans le rythme.' : d > 0 ? `Tu as ${money0(d)} d'avance sur le rythme.` : `Tu dépenses ${money0(-d)} plus vite que le rythme.`}<br><span style="opacity:.75;font-weight:600">Le trait bleu : ce que tu aurais dépensé en répartissant ${money0(h.free)} également sur ${h.len} jours.</span>`;
-    bubble.style.left = (r.left + r.width / 2) + 'px'; bubble.style.top = (r.top + r.height / 2) + 'px';
+    bubble.style.left = (r.left + r.width / 2) + 'px'; bubble.style.top = (anchor ? r.top - bubble.offsetHeight / 2 - 10 : r.top + r.height / 2) + 'px';
     bubble.hidden = false; buzz('tile'); UI.paceShown = Date.now();
-    clearTimeout(hideT); hideT = setTimeout(() => { bubble.hidden = true; }, 4000);
+    if (anchor) bubble.style.top = (r.top - bubble.offsetHeight / 2 - 10) + 'px';
+    clearTimeout(hideT); hideT = setTimeout(() => { bubble.hidden = true; }, 5000);
   };
+  window.showPace = (el) => { if (!bubble.hidden && el) { bubble.hidden = true; return; } show(el); };
+  document.addEventListener('click', (e) => { if (!bubble.hidden && !e.target.closest('#dialN')) bubble.hidden = true; });
   document.addEventListener('touchstart', (e) => {
     if (!e.target.closest('#dial') || nativeOn() || e.touches.length > 1) return;
     sx = e.touches[0].clientX; sy = e.touches[0].clientY; clearTimeout(timer); timer = setTimeout(show, 450);
@@ -3205,6 +3211,28 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) rere
   document.addEventListener('touchend', () => { clearTimeout(timer); timer = null; });
   document.addEventListener('scroll', () => { bubble.hidden = true; }, { passive: true });
   document.addEventListener('contextmenu', (e) => { if (e.target.closest('#dial')) e.preventDefault(); });
+})();
+// Sheets: drag down (from the top of the panel, or anywhere when it is scrolled to the top) to close.
+(function sheetDrag() {
+  const panel = $('#sheetPanel'); let y0 = 0, t0 = 0, dy = 0, on = false;
+  panel.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1 || e.target.closest('input, select, textarea, .chips, .tiles')) return;
+    on = panel.scrollTop <= 0; y0 = e.touches[0].clientY; t0 = Date.now(); dy = 0;
+  }, { passive: true });
+  panel.addEventListener('touchmove', (e) => {
+    if (!on) return;
+    dy = e.touches[0].clientY - y0;
+    if (dy <= 0) { panel.style.transform = ''; return; }
+    if (e.cancelable) e.preventDefault();
+    panel.style.transition = 'none'; panel.style.transform = `translateY(${dy}px)`;
+  }, { passive: false });
+  panel.addEventListener('touchend', () => {
+    if (!on) return; on = false;
+    const fast = dy > 40 && dy / Math.max(1, Date.now() - t0) > .5;
+    panel.style.transition = 'transform .22s ease';
+    if (dy > 110 || fast) { panel.style.transform = 'translateY(100%)'; setTimeout(() => { panel.style.transform = ''; panel.style.transition = ''; closeSheet(); }, 200); }
+    else { panel.style.transform = ''; setTimeout(() => { panel.style.transition = ''; }, 230); }
+  });
 })();
 // Long-press a category tile, then slide over the others: a bubble names the tile under the finger
 // (with a light tick on each change); lifting the finger picks it. A quick swipe still scrolls the tiles.

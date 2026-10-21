@@ -1,6 +1,6 @@
 {
   "name": "expy",
-  "version": "1.29.1",
+  "version": "1.29.2",
   "private": true,
   "description": "Expy : budget personnel, app Android (Capacitor) et PWA.",
   "scripts": {
