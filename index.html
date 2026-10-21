@@ -117,7 +117,7 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 #v-home { gap: 8px; }
 .homehead .per { font-size: 13px; font-weight: 700; color: var(--muted); border: 0; background: transparent; padding: 0; }
 .daypill { font-size: 12px; font-weight: 800; background: var(--fg); color: var(--bg); padding: 5px 11px; border-radius: 999px; }
-:root { --c-debt: #8B3DFF; --c-save: #12A150; --mo-ms: 920ms; --mo-ease: cubic-bezier(.65,0,.35,1); }
+:root { --c-debt: var(--p1); --c-save: var(--p2); --c-wish: var(--p3); --c-spend: var(--p5); --mo-ms: 920ms; --mo-ease: cubic-bezier(.65,0,.35,1); }
 .dial { --ring: min(222px, 26vh); --ring: min(222px, 26dvh); position: relative; width: var(--ring); height: var(--ring); margin: 0 auto; container-type: inline-size; flex: none; max-width: 100%; transition: width var(--mo-ms) var(--mo-ease), height var(--mo-ms) var(--mo-ease); }
 .dial > svg { position: absolute; left: 50%; top: 0; width: var(--ring); height: var(--ring); margin-left: calc(var(--ring) / -2); display: block; transition: opacity .22s, transform var(--mo-ms) var(--mo-ease); transform-origin: 50% 100%; }
 /* Keyboard open: the ring flattens into a bar, the amount grows */
@@ -152,7 +152,18 @@ body.kb .amount .cur { font-size: 7cqw; }
 .dial-n b { color: var(--fg); font-weight: 800; }
 .dial-n .bad { color: var(--bad); }
 .dial-k:empty { display: none; }
-.legend { display: block; text-align: center; font-size: 13.5px; font-weight: 600; color: var(--muted); border: 0; background: transparent; width: 100%; padding: 0; }
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; }
+.legend .bk { display: inline-flex; align-items: center; gap: 7px; border: 1.5px solid var(--line); background: transparent; border-radius: 999px; padding: 5px 11px 5px 6px; font: inherit; font-size: 13px; font-weight: 700; color: var(--muted); }
+.legend .bk .num { color: var(--fg); }
+.legend .bk .box { width: 18px; height: 18px; border-radius: 6px; border: 2px solid var(--muted); display: grid; place-items: center; transition: background .15s, border-color .15s; }
+.legend .bk .box svg { width: 13px; height: 13px; fill: none; stroke: #0A0A0A; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .15s; }
+.legend .bk[aria-pressed="true"] { border-color: var(--bk); color: var(--fg); }
+.legend .bk[aria-pressed="true"] .box { background: var(--bk); border-color: var(--bk); }
+.legend .bk[aria-pressed="true"] .box svg { opacity: 1; }
+.gainpill { display: block; margin: 0 auto; border: 0; border-radius: 999px; background: var(--p4); color: #0E5A2E; font: inherit; font-size: 14px; font-weight: 700; padding: 7px 16px; }
+.gainpill b { font-weight: 800; color: #0A0A0A; }
+.gainpill[hidden] { display: none; }
+body.kb .gainpill { display: none; }
 .legend[hidden] { display: none; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
 .legend .lk { color: var(--accent); }
@@ -299,12 +310,11 @@ body.kb .wrap { padding-bottom: 16px; }
 /* Pastel card stacks (debts, wishes) */
 .stack { background: transparent; border-radius: 0; overflow: visible; display: flex; flex-direction: column; gap: 10px; }
 .stack > li { border-radius: 24px; overflow: hidden; color: #0A0A0A; --fg: #0A0A0A; --muted: #4A4A4A; --ok: #0E6B38; --bad: #B3261E; --line: rgba(10,10,10,.14); --bg: #fff; }
-.stack > li:nth-child(6n+1) { background: var(--p1); }
-.stack > li:nth-child(6n+2) { background: var(--p2); }
-.stack > li:nth-child(6n+3) { background: var(--p3); }
-.stack > li:nth-child(6n+4) { background: var(--p4); }
-.stack > li:nth-child(6n+5) { background: var(--p5); }
-.stack > li:nth-child(6n+6) { background: var(--p6); }
+/* v1.29: one pastel per kind, everywhere (debts pink, savings yellow, wishes blue, spending violet). */
+.stack > li { background: var(--p3); }
+.stack.k-debts > li, .stack > li.k-debts { background: var(--c-debt); }
+.stack.k-goals > li, .stack > li.k-goals { background: var(--c-save); }
+.stack.k-wishes > li, .stack > li.k-wishes { background: var(--c-wish); }
 .stack .tag.prio { background: #0A0A0A; color: #fff; }
 .stack .tag.ex { border-color: #4A4A4A; }
 .meter { height: 8px; border-radius: 999px; background: rgba(10,10,10,.14); overflow: hidden; margin-top: 8px; }
@@ -479,10 +489,11 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
         <div class="amount" id="amount"><input class="big num" id="amtIn" type="text" inputmode="none" readonly autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="0" aria-label="Montant de la dépense"><span class="cur">$</span></div>
       </div>
       <button class="kb-x" id="kbClose" data-act="kb-close" type="button" aria-label="Fermer le clavier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-      <div class="hbar" id="hbar" aria-hidden="true"><i id="hb-sp"></i><i id="hb-gh"></i><i id="hb-de"></i><i id="hb-sa"></i><b id="hb-pc"></b></div>
+      <div class="hbar" id="hbar" aria-hidden="true"><i id="hb-de"></i><i id="hb-wi"></i><i id="hb-sa"></i><i id="hb-sp"></i><i id="hb-gh"></i><b id="hb-pc"></b></div>
     </div>
     <div class="dial-n" id="dialN" aria-live="polite"></div>
-    <button class="legend" id="legend" data-act="reserve-info" hidden></button>
+    <div class="legend" id="legend" role="group" aria-label="Détailler la partie noire" hidden></div>
+    <button class="gainpill" id="gainPill" hidden></button>
     <div class="stats3" id="stats3"></div>
     <div class="entry">
       <div class="tiles" id="chips" role="group" aria-label="Catégorie"></div>
@@ -642,7 +653,7 @@ function defaultSettings() {
     catsV: 3,
     debts: [], payments: [], debtBudget: 0, method: 'avalanche',
     wishes: [], wishCushion: 0, wishRate: null, wishAfterDebts: false,
-    leftoverPct: 100, reviewed: {},
+    leftoverPct: 100, reviewed: {}, ringShow: { spend: false, debt: false, wish: false, save: false },
     alerts: {}, lastExport: null, theme: 'auto',
     people: [], settles: [], lastSplit: null, goals: [], debtReserve: false, debtGoalBy: null, debtSince: null, kb: 'native',
     profile: null, profileSkip: false, accounts: [], fx: true, haptic: 2, name: '', incomes: [], merchantCats: {},
@@ -754,6 +765,8 @@ function normalize(st) {
   s.name = typeof s.name === 'string' ? s.name.trim().slice(0, 24) : '';
   if (!Array.isArray(s.incomes)) s.incomes = [];
   if (!s.merchantCats || typeof s.merchantCats !== 'object') s.merchantCats = {};
+  const rsh = s.ringShow && typeof s.ringShow === 'object' ? s.ringShow : {};
+  s.ringShow = { spend: rsh.spend === true, debt: rsh.debt === true, wish: rsh.wish === true, save: rsh.save === true };
   s.incomes = s.incomes.filter(i => i && i.id && i.amt > 0 && typeof i.ts === 'string');
   // A restored backup may come from anywhere: keep only well-formed values (numbers, dates, #RRGGBB colors, text ids).
   const num = (v, d = 0) => Number.isFinite(+v) && v !== null && v !== '' ? +v : d;
@@ -1006,12 +1019,12 @@ function leftoverExtra() {
 }
 // This period's leftover so far, if it is kept and goes to the debts: debt down by that much, debt-free N days sooner
 // (compared with the monthly budget alone).
-function leftoverGain() {
-  const s = S.settings, h = UI.hs || homeState();
-  if (!debtShare() || !h || !h.per || h.left <= 0 || s.debtBudget <= 0) return null;
+function leftoverGain(share) {
+  const s = S.settings, h = UI.hs || homeState(), k = share ?? debtShare();
+  if (!k || !h || !h.per || h.left <= 0 || s.debtBudget <= 0) return null;
   const bal = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
   if (bal <= 0) return null;
-  const amt = Math.min(Math.round(h.left * debtShare()), bal), a = simulate(s.debts, s.debtBudget, s.method), b = simulate(s.debts, s.debtBudget, s.method, amt);
+  const amt = Math.min(Math.round(h.left * k), bal), a = simulate(s.debts, s.debtBudget, s.method), b = simulate(s.debts, s.debtBudget, s.method, amt);
   if (a.exact == null || b.exact == null || a.short) return null;
   const to = s.debts.find(d => d.id === a.priority);
   return { amt, days: Math.max(0, Math.round((a.exact - b.exact) * DAYS_MO)), interest: Math.max(0, a.interest - b.interest), to: to ? to.name : '', end: h.per.end };
@@ -1290,11 +1303,21 @@ function tween(ms, ease, step, done) {
   const f = (now) => { const k = Math.min(1, Math.max(0, (now - t0) / ms)); step(ease(k)); if (k < 1) requestAnimationFrame(f); else if (done) done(); };
   requestAnimationFrame(f);
 }
-// v1.28: the ring shows only what can be spent (threshold less what is set aside, plus money received).
-const dialScale = (h) => h.free + h.inc > 0 ? h.free + h.inc : h.amount;
+// v1.29: the ring is the whole threshold (plus money received). Its black part is everything the period already
+// takes: debts and wishes set aside, savings, then spending. Each kind can be shown in its own pastel (boxes under the ring).
+const dialScale = (h) => h.amount + h.inc;
+const PARTS = [['debt', 'Dettes', 'var(--c-debt)'], ['wish', 'Souhaits', 'var(--c-wish)'], ['save', 'Épargne', 'var(--c-save)'], ['spend', 'Dépenses', 'var(--c-spend)']];
+function dialParts(h, view) {
+  const A = dialScale(h), show = S.settings.ringShow, rs = h.rs;
+  const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)';
+  const val = { debt: rs.debt, wish: rs.wish, save: rs.save, spend: view };
+  let a = 0; const out = [];
+  for (const [k, , col] of PARTS) { const l = Math.min(Math.max(0, val[k]) / A, 1 - a); out.push({ k, a, l, col: show[k] ? col : hot }); a += l; }
+  return { A, parts: out, end: a, pace: h.free > 0 ? Math.min(1, (rs.total + h.free * (h.elapsed - 0.5) / h.len) / A) : null };
+}
 // Point on the dial where spending now ends (ring head, or the bar when the keyboard is up).
 function dialTarget(spent) {
-  const h = UI.hs, A = h && h.per ? dialScale(h) : 0, f = A ? Math.min(spent / A, 1) : 0;
+  const h = UI.hs, A = h && h.per ? dialScale(h) : 0, f = A ? Math.min((h.rs.total + spent) / A, 1) : 0;
   if (document.body.classList.contains('kb')) { const r = $('#hbar').getBoundingClientRect(); return { x: r.left + r.width * f, y: r.top + r.height / 2 }; }
   const r = $('#ring').getBoundingClientRect(), a = f * 2 * Math.PI - Math.PI / 2, rad = r.width * 100 / 240;
   return A ? { x: r.left + r.width / 2 + rad * Math.cos(a), y: r.top + r.height / 2 + rad * Math.sin(a) } : { x: r.left + r.width / 2, y: r.top + r.height / 2 };
@@ -1347,10 +1370,9 @@ function ringCatchUp() {
 // Coloured segments along the track (fractions 0-1), as drawn by the ring and the bar.
 function dialSegs(view) {
   const h = UI.hs; if (!h || !h.per) return [];
-  const A = dialScale(h), e = entryCost(), sp = Math.min(view / A, 1);
-  const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)';
-  const out = [[0, sp, hot, 'round']];
-  if (e > 0) out.push([sp, Math.min(e / A, 1 - sp), catById(UI.cat).color, 'round']);
+  const { A, parts, end } = dialParts(h, view), e = entryCost();
+  const out = parts.map(p => [p.a, p.l, p.col, 'butt']);
+  if (e > 0) out.push([end, Math.min(e / A, 1 - end), catById(UI.cat).color, 'round']);
   return out.filter(s => s[1] > 0.0004);
 }
 /* Ring <-> bar morph. The ring unrolls like tape from its start (12 o'clock) toward the bar, at the top of
@@ -1418,13 +1440,25 @@ function renderSummary() {
   const lg = $('#legend'), st = $('#stats3');
   st.innerHTML = '';
   if (h.per) {
-    lg.hidden = !h.rs.total;
-    lg.innerHTML = h.rs.total ? `${money0(h.rs.total)} mis de côté cette période <span class="lk">›</span>` : '';
+    const val = { debt: h.rs.debt, wish: h.rs.wish, save: h.rs.save, spend: h.spent }, show = S.settings.ringShow;
+    lg.hidden = false;
+    lg.innerHTML = PARTS.filter(([k]) => k === 'spend' || val[k] > 0).map(([k, l, col]) => `<button type="button" class="bk" data-act="ring-show" data-part="${k}" aria-pressed="${show[k]}" style="--bk:${col}"><span class="box" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>${l} <span class="num">${money0(val[k])}</span></button>`).join('');
   } else {
     lg.hidden = true; lg.innerHTML = '';
     st.innerHTML = `<button class="set-th" data-act="edit-th">Définir une période et un seuil</button>`;
   }
+  renderGainPill(h);
   renderRing();
+}
+// Above the categories: what this period's leftover is worth on the debts (as if it all went there when nothing is set).
+function renderGainPill(h) {
+  const el = $('#gainPill'), s = S.settings, pct = s.leftoverPct;
+  const g = h && h.per && s.debts.some(d => d.bal > 0) ? leftoverGain(pct ? null : 1) : null;
+  el.hidden = !(g && g.days > 0);
+  if (el.hidden) { el.innerHTML = ''; return; }
+  el.dataset.act = pct ? 'tab' : 'open-set'; if (pct) el.dataset.tab = 'debts'; else el.dataset.s = 'profil';
+  el.innerHTML = pct ? `<b>−${g.days} jour${g.days > 1 ? 's' : ''}</b> sur tes dettes avec ton reste`
+    : `Ton reste = <b>−${g.days} jour${g.days > 1 ? 's' : ''}</b> de dettes ›`;
 }
 function renderRing() {
   const h = UI.hs; if (!h) return;
@@ -1432,13 +1466,16 @@ function renderRing() {
   const arc = (a, l, color, cap) => l > 0.0004 ? `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" stroke-linecap="${cap || 'butt'}" style="stroke:${esc(color)}" stroke-dasharray="${(l * C).toFixed(1)} ${(C - l * C + 2).toFixed(1)}" stroke-dashoffset="${(-a * C).toFixed(1)}" transform="rotate(-90 120 120)"/>` : '';
   let svg = `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" style="stroke:var(--surface-2)"/>`, note, label;
   if (h.per) {
-    const A = dialScale(h), rs = h.rs;
-    const sp = Math.min((UI.ringView ?? h.spent) / A, 1);
-    const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)';
-    svg += arc(0, sp, hot, 'round');
-    if (e > 0) svg += arc(sp, Math.min(e / A, 1 - sp), catById(UI.cat).color, 'round');
-    if (h.free > 0) {
-      const ang = Math.min(1, (h.free * (h.elapsed - 0.5) / h.len) / A) * 2 * Math.PI - Math.PI / 2, cx = Math.cos(ang), cy = Math.sin(ang);
+    const { A, parts, end, pace } = dialParts(h, UI.ringView ?? h.spent), rs = h.rs;
+    // Same-colour neighbours are drawn as one arc; round ends are dots so a run can end round on one side only.
+    const runs = [];
+    for (const p of parts) { if (p.l <= 0.0004) continue; const r = runs[runs.length - 1]; if (r && r.col === p.col && Math.abs(r.a + r.l - p.a) < 1e-6) r.l += p.l; else runs.push({ a: p.a, l: p.l, col: p.col }); }
+    const dot = (f, col) => { const g = f * 2 * Math.PI - Math.PI / 2; return `<circle cx="${(120 + 100 * Math.cos(g)).toFixed(1)}" cy="${(120 + 100 * Math.sin(g)).toFixed(1)}" r="10" style="fill:${esc(col)}"/>`; };
+    for (const r of runs) svg += arc(r.a, r.l, r.col);
+    if (runs.length) svg += dot(0, runs[0].col) + dot(end, runs[runs.length - 1].col);
+    if (e > 0) svg += arc(end, Math.min(e / A, 1 - end), catById(UI.cat).color, 'round');
+    if (pace != null) {
+      const ang = pace * 2 * Math.PI - Math.PI / 2, cx = Math.cos(ang), cy = Math.sin(ang);
       svg += `<line x1="${(120 + 87 * cx).toFixed(1)}" y1="${(120 + 87 * cy).toFixed(1)}" x2="${(120 + 113 * cx).toFixed(1)}" y2="${(120 + 113 * cy).toFixed(1)}" stroke-width="4" stroke-linecap="round" style="stroke:var(--accent)"/>`;
     }
     if (UI.income && amtCents() > 0) note = `<span style="color:var(--ok)">→ reste ${money(h.left + amtCents())}</span>`;
@@ -1450,29 +1487,19 @@ function renderRing() {
       note = `<span class="${left < 0 ? 'bad' : 'muted'}">${left < 0 ? 'dépassé de ' + money0(-left) : 'reste <b>' + money0(left) + '</b>'}</span>`
         + (left > 0 && h.daysLeft > 0 ? `<span class="muted"> · ${money0(left / h.daysLeft)}/jour</span>` : '');
     }
-    label = `${Math.round(h.spent / A * 100)} % de ce que tu peux dépenser${rs.total ? ` (${money0(rs.total)} mis de côté)` : ''}`;
+    label = `${Math.round((rs.total + h.spent) / A * 100)} % du seuil pris : ${money0(h.spent)} dépensés${rs.total ? `, ${money0(rs.total)} mis de côté` : ''}`;
   } else {
     note = `<span class="muted">${esc(h.label)} : ${money0(h.spent)}</span>`; label = 'Aucune période définie';
   }
   $('#ring').innerHTML = svg; $('#ring').setAttribute('aria-label', label);
   const seg = (id, a, l, c) => { const el = $('#' + id); el.style.left = (a * 100).toFixed(2) + '%'; el.style.width = (Math.max(0, l) * 100).toFixed(2) + '%'; if (c) el.style.background = c; };
   if (h.per) {
-    const A = dialScale(h), sp = Math.min((UI.barView ?? h.spent) / A, 1);
-    seg('hb-sp', 0, sp, h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)');
-    seg('hb-gh', sp, e > 0 ? Math.min(e / A, 1 - sp) : 0, catById(UI.cat).color);
-    seg('hb-de', 0, 0); seg('hb-sa', 0, 0);
-    $('#hb-pc').style.left = (h.free > 0 ? Math.min(100, (h.free * (h.elapsed - 0.5) / h.len) / A * 100) : -5) + '%';
-  } else for (const id of ['hb-sp', 'hb-gh', 'hb-de', 'hb-sa']) seg(id, 0, 0);
+    const { A, parts, end, pace } = dialParts(h, UI.barView ?? h.spent), ids = { debt: 'hb-de', wish: 'hb-wi', save: 'hb-sa', spend: 'hb-sp' };
+    for (const p of parts) seg(ids[p.k], p.a, p.l, p.col);
+    seg('hb-gh', end, e > 0 ? Math.min(e / A, 1 - end) : 0, catById(UI.cat).color);
+    $('#hb-pc').style.left = (pace != null ? pace * 100 : -5) + '%';
+  } else for (const id of ['hb-sp', 'hb-gh', 'hb-de', 'hb-wi', 'hb-sa']) seg(id, 0, 0);
   $('#dialN').innerHTML = note;
-}
-// What this period sets aside before what can be spent (wishes with a date, savings goals, debts).
-function sheetReserve() {
-  const h = UI.hs || homeState(); if (!h || !h.per) return;
-  const rs = h.rs, row = (n, v, act, tab) => `<button class="dline" data-act="${act}"${tab ? ` data-tab="${tab}"` : ''} style="border:0;background:none;width:100%;padding:6px 0;font:inherit;color:inherit;text-align:left"><span>${esc(n)}</span><span class="num">${money0(v)}</span></button>`;
-  openSheet(`<h1>Mis de côté</h1>
-    <div class="note">Cette période (${esc(rangeLabel(h.per))}), sur ton seuil de ${money0(h.amount)} : ${money0(rs.total)} sont mis de côté. Tu peux donc dépenser ${money0(h.free)}${h.inc ? `, plus ${money0(h.inc)} reçus` : ''} : c'est ce que montre l'anneau.</div>
-    <div class="card">${rs.wishes.map(w => row(w.name, w.amt, 'tab', 'wishes')).join('')}${rs.save ? row('Objectifs d\'épargne', rs.save, 'tab', 'goals') : ''}${rs.debt ? row('Dettes', rs.debt, 'tab', 'debts') : ''}</div>
-    <button class="btn ghost block" data-act="close-sheet">Fermer</button>`);
 }
 // The latest finished period whose debts have not been updated yet (shown the day after it ends).
 function pendingReview() {
@@ -1552,7 +1579,7 @@ function dashData() {
 }
 function renderDash() {
   const s = S.settings, dd = dashData(), per = activePeriod();
-  const card = (tab, title, o) => `<li><button class="debt" data-act="tab" data-tab="${tab}">
+  const card = (tab, title, o) => `<li class="k-${tab}"><button class="debt" data-act="tab" data-tab="${tab}">
     <span class="l1"><span class="name">${title}</span><span class="bal num">${o.p} %</span></span>
     <span class="l2"><span>${esc(o.sub)}</span></span>
     <span class="meter" aria-hidden="true"><i style="width:${Math.max(3, o.p)}%"></i></span>
@@ -1955,7 +1982,7 @@ function renderGoals() {
       <div class="note">Période de ${periodLen(per)} jours. Chaque objectif prend une part du seuil proportionnelle à la durée de la période, retirée de ce que tu peux dépenser.${rs.debt ? ` Le libre tient aussi compte de ${money0(rs.debt)} pour les dettes (onglet Dettes).` : ''}</div>`
     : `<div class="note">Définis une période et un seuil pour voir la part réservée à chaque objectif.</div>`}</div>`;
   if (!s.goals.length) body += `<div class="empty">Aucun objectif d'épargne. Exemple : 1 200 $ d'ici la fin de l'année. Expy en réserve une part à chaque période.</div>`;
-  else body += `<ul class="list stack">${s.goals.map(g => {
+  else body += `<ul class="list stack k-goals">${s.goals.map(g => {
     const a = rs ? (rs.goals.find(x => x.id === g.id) || { amt: 0 }).amt : 0, p = Math.min(100, Math.round(g.saved / g.target * 100));
     const over = g.by < todayISO() && g.target > g.saved;
     return `<li><button class="debt" data-act="goal-edit" data-id="${esc(g.id)}">
@@ -2012,7 +2039,7 @@ function renderDebts() {
   ${active.length ? leftoverCard() : ''}
   ${active.length ? debtByCard(sim) : ''}`;
   const ordered = [...active].sort((a, b) => (sim.payoff[a.id] ?? 1e9) - (sim.payoff[b.id] ?? 1e9));
-  body += `<ul class="list stack" id="debtList">${[...ordered, ...paid].map(d => {
+  body += `<ul class="list stack k-debts" id="debtList">${[...ordered, ...paid].map(d => {
     const k = sim.payoff[d.id];
     const interestOnly = d.bal > 0 && d.min <= d.bal * d.apr / 1200;
     return `<li><button class="debt" data-act="debt-edit" data-id="${esc(d.id)}">
@@ -2287,7 +2314,7 @@ function renderWishes() {
   }).join('');
   const debtHint = hasDebt && !wishesWaitForDebts() && undated
     ? `<p class="note">Tu as ${money0(s.debts.reduce((a, d) => a + d.bal, 0))} de dettes. Les rembourser avant coûte souvent moins cher que leurs intérêts : coche « Commencer après la libération des dettes » dans Modifier.</p>` : '';
-  $('#v-wishes').innerHTML = head + `<ul class="list stack">${li}</ul>
+  $('#v-wishes').innerHTML = head + `<ul class="list stack k-wishes">${li}</ul>
     <p class="note">Total : ${money0(total)}, dont ${money0(saved)} de côté. Un souhait daté prend sa part de chaque période, retirée de ton seuil. Les souhaits sans date se remplissent dans l'ordre de la liste.</p>${debtHint}`;
 }
 function sheetWish(id) {
@@ -2503,7 +2530,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.28.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.29.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -3048,7 +3075,7 @@ document.addEventListener('click', (e) => {
     case 'person-new': sheetPerson(); break;
     case 'share-open': sheetShare(t.dataset.id); break;
     case 'goals': showTab('goals'); break;
-    case 'reserve-info': sheetReserve(); break;
+    case 'ring-show': { const k = t.dataset.part, sh = S.settings.ringShow; sh[k] = !sh[k]; persist('settings'); buzz('tile'); renderSummary(); break; }
     case 'haptic': S.settings.haptic = +t.dataset.v; persist('settings'); buzz('hit'); renderSettings(); break;
     case 'haptic-test': {
       // Diagnostic: one long, unmistakable pulse, bypassing the Effects setting, and what the browser answered.
