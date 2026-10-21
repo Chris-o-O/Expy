@@ -124,7 +124,7 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 .hbar { position: absolute; left: 0; right: 0; top: 2px; height: 14px; border-radius: 999px; background: var(--surface-2); overflow: hidden; opacity: 0; transform: scaleX(.3); transition: opacity .25s .1s, transform var(--mo-ms) var(--mo-ease); pointer-events: none; }
 .hbar i { position: absolute; top: 0; bottom: 0; transition: left .3s ease, width .3s ease, background-color .2s; }
 .hbar b { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: var(--accent); transition: left .3s ease; }
-body.kb .dial { width: 100%; height: 132px; }
+body.kb .dial { width: 100%; height: 112px; }
 /* Ring <-> bar morph (v1.14): the real ring and bar hide while an overlay draws the tape unrolling. */
 .morph-layer { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
 .morph-layer svg { position: absolute; left: 0; top: 0; overflow: visible; }
@@ -136,7 +136,7 @@ body.kb .amount .big { font-size: 17cqw; }
 body.kb .amount[data-l="l"] .big { font-size: 14cqw; }
 body.kb .amount[data-l="xl"] .big { font-size: 11cqw; }
 body.kb .dial-k { font-size: 3.6cqw; }
-body.kb .dial-n { font-size: 4.2cqw; }
+body.kb .dial-n { font-size: 15px; margin-top: 0; }
 body.kb .amount .cur { font-size: 7cqw; }
 .dial-c { transition: inset var(--mo-ms) var(--mo-ease), padding var(--mo-ms) var(--mo-ease); position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1cqw; padding-inline: 13cqw; }
 .dial-k { font-size: 4.6cqw; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 1.5cqw; }
@@ -148,10 +148,11 @@ body.kb .amount .cur { font-size: 7cqw; }
 .amount[data-l="l"] .big { font-size: 16cqw; }
 .amount[data-l="xl"] .big { font-size: 12.5cqw; }
 .amount .cur { font-size: 9cqw; font-weight: 700; color: var(--muted); }
-.dial-n { font-size: 5.4cqw; font-weight: 700; min-height: 1.3em; text-align: center; white-space: nowrap; }
-.dial-n .gain { display: block; margin: 2px auto 0; border: 0; background: none; padding: 0; font: inherit; font-size: .78em; color: var(--c-debt); font-weight: 800; }
-body.kb .dial-n .gain { display: none; }
-.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; font-size: 12.5px; font-weight: 700; color: var(--muted); border: 0; background: transparent; width: 100%; padding: 0; }
+.dial-n { font-size: 17px; font-weight: 700; min-height: 1.35em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: -2px; }
+.dial-n b { color: var(--fg); font-weight: 800; }
+.dial-n .bad { color: var(--bad); }
+.dial-k:empty { display: none; }
+.legend { display: block; text-align: center; font-size: 13.5px; font-weight: 600; color: var(--muted); border: 0; background: transparent; width: 100%; padding: 0; }
 .legend[hidden] { display: none; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
 .legend .lk { color: var(--accent); }
@@ -252,7 +253,7 @@ body.kb .wrap { padding-bottom: 16px; }
 .chip .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .chip[aria-pressed="true"] { border-color: var(--fg); background: var(--fg); color: var(--bg); }
 /* Category tiles with icons: two rows, scroll sideways */
-.tiles { display: grid; grid-template-rows: repeat(2, 52px); grid-auto-flow: column; grid-auto-columns: calc((100% - 32px) / 5); gap: 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; }
+.tiles { display: grid; grid-template-rows: repeat(2, 52px); grid-auto-flow: column; grid-auto-columns: calc((100% - 32px) / 5); gap: 13px 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; }
 .tiles::-webkit-scrollbar { display: none; }
 .tile { scroll-snap-align: start; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 18px; background: var(--surface); padding: 0; min-width: 0; }
 .tile .ico { width: 34px; height: 34px; }
@@ -333,6 +334,13 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 .big3 .v small { font-size: 15px; font-weight: 700; }
 
 /* Banners */
+.bline { display: flex; align-items: center; gap: 4px; background: var(--surface-2); border-radius: 999px; }
+.bline .bl-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; border: 0; background: none; padding: 10px 6px 10px 16px; font: inherit; font-size: 14px; font-weight: 700; color: var(--fg); text-align: left; }
+.bline .bl-main span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bline .bl-main i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.bline.warn i { background: var(--warn); } .bline.bad i { background: var(--bad); } .bline.acc i { background: var(--accent); }
+.bline .bl-main b { color: var(--accent); font-weight: 800; }
+.bline .bl-x { border: 0; background: none; width: 40px; height: 40px; font-size: 20px; color: var(--muted); flex: none; }
 .banner { border-radius: 20px; padding: 12px 14px; font-size: 13.5px; display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1.5px solid var(--line); background: var(--surface); }
 .banner.ex { border-style: dashed; }
 .banner.warn { border-color: var(--warn); }
@@ -469,12 +477,12 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
       <div class="dial-c">
         <div class="dial-k" id="dialK">Saisie</div>
         <div class="amount" id="amount"><input class="big num" id="amtIn" type="text" inputmode="none" readonly autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="0" aria-label="Montant de la dépense"><span class="cur">$</span></div>
-        <div class="dial-n" id="dialN" aria-live="polite"></div>
       </div>
       <button class="kb-x" id="kbClose" data-act="kb-close" type="button" aria-label="Fermer le clavier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       <div class="hbar" id="hbar" aria-hidden="true"><i id="hb-sp"></i><i id="hb-gh"></i><i id="hb-de"></i><i id="hb-sa"></i><b id="hb-pc"></b></div>
     </div>
-    <button class="legend" id="legend" data-act="goals" hidden></button>
+    <div class="dial-n" id="dialN" aria-live="polite"></div>
+    <button class="legend" id="legend" data-act="reserve-info" hidden></button>
     <div class="stats3" id="stats3"></div>
     <div class="entry">
       <div class="tiles" id="chips" role="group" aria-label="Catégorie"></div>
@@ -1083,7 +1091,7 @@ function renderAmount() {
   $('#amount').dataset.l = txt.length > 8 ? 'xl' : txt.length > 5 ? 'l' : '';
   $('#amount').classList.toggle('can-kb', canKb());
   document.body.classList.toggle('appkeys', !canKb());
-  $('#dialK').innerHTML = (UI.income ? 'Entrée' : 'Saisie') + (canKb() ? KB_SVG : '');
+  $('#dialK').innerHTML = UI.income ? 'Entrée d\'argent' : '';
   const ok = amtCents() > 0; $('#addBtn').disabled = !ok; $('#addBtn2').disabled = !ok;
   $('#v-home').classList.toggle('typing', nativeOn() || ok || UI.split.on || UI.optsOpen || !!UI.income);
   $('#v-home').classList.toggle('inc', !!UI.income);
@@ -1282,9 +1290,11 @@ function tween(ms, ease, step, done) {
   const f = (now) => { const k = Math.min(1, Math.max(0, (now - t0) / ms)); step(ease(k)); if (k < 1) requestAnimationFrame(f); else if (done) done(); };
   requestAnimationFrame(f);
 }
+// v1.28: the ring shows only what can be spent (threshold less what is set aside, plus money received).
+const dialScale = (h) => h.free + h.inc > 0 ? h.free + h.inc : h.amount;
 // Point on the dial where spending now ends (ring head, or the bar when the keyboard is up).
 function dialTarget(spent) {
-  const h = UI.hs, A = h && h.per ? h.amount : 0, f = A ? Math.min(spent / A, 1) : 0;
+  const h = UI.hs, A = h && h.per ? dialScale(h) : 0, f = A ? Math.min(spent / A, 1) : 0;
   if (document.body.classList.contains('kb')) { const r = $('#hbar').getBoundingClientRect(); return { x: r.left + r.width * f, y: r.top + r.height / 2 }; }
   const r = $('#ring').getBoundingClientRect(), a = f * 2 * Math.PI - Math.PI / 2, rad = r.width * 100 / 240;
   return A ? { x: r.left + r.width / 2 + rad * Math.cos(a), y: r.top + r.height / 2 + rad * Math.sin(a) } : { x: r.left + r.width / 2, y: r.top + r.height / 2 };
@@ -1337,10 +1347,9 @@ function ringCatchUp() {
 // Coloured segments along the track (fractions 0-1), as drawn by the ring and the bar.
 function dialSegs(view) {
   const h = UI.hs; if (!h || !h.per) return [];
-  const A = h.amount, rs = h.rs, e = entryCost();
-  const fs = Math.min((rs.save + rs.wish) / A, 1), fd = Math.min(rs.debt / A, 1 - fs), sp = Math.min(view / A, 1);
+  const A = dialScale(h), e = entryCost(), sp = Math.min(view / A, 1);
   const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)';
-  const out = [[1 - fs, fs, 'var(--c-save)', 'butt'], [1 - fs - fd, fd, 'var(--c-debt)', 'butt'], [0, sp, hot, 'round']];
+  const out = [[0, sp, hot, 'round']];
   if (e > 0) out.push([sp, Math.min(e / A, 1 - sp), catById(UI.cat).color, 'round']);
   return out.filter(s => s[1] > 0.0004);
 }
@@ -1407,21 +1416,10 @@ function renderSummary() {
     ? `<button class="per" data-act="edit-th" aria-label="Modifier la période et le seuil">${esc(h.label)}</button><span class="daypill">Jour ${h.elapsed} / ${h.len}</span>`
     : `<span class="per">${esc(h.label)}</span>`;
   const lg = $('#legend'), st = $('#stats3');
+  st.innerHTML = '';
   if (h.per) {
-    const dot = (c) => `<i style="background:${c}"></i>`, rs = h.rs;
-    lg.hidden = false;
-    lg.innerHTML = `<span>${dot('var(--fg)')}Dépensé ${money0(h.spent)}</span>`
-      + (rs.debt ? `<span>${dot('var(--c-debt)')}Dettes ${money0(rs.debt)}</span>` : '')
-      + (rs.save ? `<span>${dot('var(--c-save)')}Épargne ${money0(rs.save)}</span>` : '')
-      + (rs.wish ? `<span>${dot('var(--c-save)')}Souhaits ${money0(rs.wish)}</span>` : '')
-      + (h.inc ? `<span style="color:var(--ok)">+${money0(h.inc)} reçus</span>` : '')
-      + (h.pace != null ? `<span><b class="pace-mk" aria-hidden="true"></b>Rythme ${money0(h.pace)}</span>` : '')
-      + `<span class="lk" aria-label="Objectifs">›</span>`;
-    const col = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--ok)';
-    const perDay = h.left > 0 && h.daysLeft > 0 ? money0(h.left / h.daysLeft) : '—';
-    st.innerHTML = `<button class="stat" data-act="edit-th"><span class="k">Reste</span><span class="v num" id="stLeft" style="color:${col}">${money0(h.left)}</span></button>
-      <div class="stat"><span class="k">Par jour</span><span class="v num">${perDay}</span></div>
-      <button class="stat home" data-act="tab" data-tab="stats"><span class="k">Maison</span><span class="v num">${money0(h.homeC)}</span></button>`;
+    lg.hidden = !h.rs.total;
+    lg.innerHTML = h.rs.total ? `${money0(h.rs.total)} mis de côté cette période <span class="lk">›</span>` : '';
   } else {
     lg.hidden = true; lg.innerHTML = '';
     st.innerHTML = `<button class="set-th" data-act="edit-th">Définir une période et un seuil</button>`;
@@ -1434,15 +1432,13 @@ function renderRing() {
   const arc = (a, l, color, cap) => l > 0.0004 ? `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" stroke-linecap="${cap || 'butt'}" style="stroke:${esc(color)}" stroke-dasharray="${(l * C).toFixed(1)} ${(C - l * C + 2).toFixed(1)}" stroke-dashoffset="${(-a * C).toFixed(1)}" transform="rotate(-90 120 120)"/>` : '';
   let svg = `<circle cx="120" cy="120" r="100" fill="none" stroke-width="20" style="stroke:var(--surface-2)"/>`, note, label;
   if (h.per) {
-    const A = h.amount, rs = h.rs;
-    const fs = Math.min((rs.save + rs.wish) / A, 1), fd = Math.min(rs.debt / A, 1 - fs);
-    svg += arc(1 - fs, fs, 'var(--c-save)') + arc(1 - fs - fd, fd, 'var(--c-debt)');
+    const A = dialScale(h), rs = h.rs;
     const sp = Math.min((UI.ringView ?? h.spent) / A, 1);
     const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)';
     svg += arc(0, sp, hot, 'round');
     if (e > 0) svg += arc(sp, Math.min(e / A, 1 - sp), catById(UI.cat).color, 'round');
     if (h.free > 0) {
-      const ang = ((h.free * (h.elapsed - 0.5) / h.len) / A) * 2 * Math.PI - Math.PI / 2, cx = Math.cos(ang), cy = Math.sin(ang);
+      const ang = Math.min(1, (h.free * (h.elapsed - 0.5) / h.len) / A) * 2 * Math.PI - Math.PI / 2, cx = Math.cos(ang), cy = Math.sin(ang);
       svg += `<line x1="${(120 + 87 * cx).toFixed(1)}" y1="${(120 + 87 * cy).toFixed(1)}" x2="${(120 + 113 * cx).toFixed(1)}" y2="${(120 + 113 * cy).toFixed(1)}" stroke-width="4" stroke-linecap="round" style="stroke:var(--accent)"/>`;
     }
     if (UI.income && amtCents() > 0) note = `<span style="color:var(--ok)">→ reste ${money(h.left + amtCents())}</span>`;
@@ -1450,24 +1446,33 @@ function renderRing() {
       const after = h.left - e;
       note = after >= 0 ? `<span style="color:${h.free > 0 && h.spent + e >= .8 * h.free ? 'var(--warn)' : 'var(--ok)'}">→ reste ${money(after)}</span>` : `<span style="color:var(--bad)">→ dépasse de ${money(-after)}</span>`;
     } else {
-      const g = leftoverGain();
-      note = `<span class="muted">reste ${money((nativeOn() ? UI.barView : UI.ringView) == null ? h.left : h.left + h.spent - Math.round(nativeOn() ? UI.barView : UI.ringView))}</span>`
-        + (g && g.days > 0 ? `<button type="button" class="gain" data-act="tab" data-tab="debts">${g.days} j de dettes en moins</button>` : '');
+      const v = nativeOn() ? UI.barView : UI.ringView, left = v == null ? h.left : h.left + h.spent - Math.round(v);
+      note = `<span class="${left < 0 ? 'bad' : 'muted'}">${left < 0 ? 'dépassé de ' + money0(-left) : 'reste <b>' + money0(left) + '</b>'}</span>`
+        + (left > 0 && h.daysLeft > 0 ? `<span class="muted"> · ${money0(left / h.daysLeft)}/jour</span>` : '');
     }
-    label = `${Math.round(h.spent / A * 100)} % du seuil dépensé${rs.total ? ', ' + Math.round(rs.total / A * 100) + ' % réservé' : ''}`;
+    label = `${Math.round(h.spent / A * 100)} % de ce que tu peux dépenser${rs.total ? ` (${money0(rs.total)} mis de côté)` : ''}`;
   } else {
     note = `<span class="muted">${esc(h.label)} : ${money0(h.spent)}</span>`; label = 'Aucune période définie';
   }
   $('#ring').innerHTML = svg; $('#ring').setAttribute('aria-label', label);
   const seg = (id, a, l, c) => { const el = $('#' + id); el.style.left = (a * 100).toFixed(2) + '%'; el.style.width = (Math.max(0, l) * 100).toFixed(2) + '%'; if (c) el.style.background = c; };
   if (h.per) {
-    const A = h.amount, rs = h.rs, fs = Math.min((rs.save + rs.wish) / A, 1), fd = Math.min(rs.debt / A, 1 - fs), sp = Math.min((UI.barView ?? h.spent) / A, 1);
+    const A = dialScale(h), sp = Math.min((UI.barView ?? h.spent) / A, 1);
     seg('hb-sp', 0, sp, h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)');
     seg('hb-gh', sp, e > 0 ? Math.min(e / A, 1 - sp) : 0, catById(UI.cat).color);
-    seg('hb-de', 1 - fs - fd, fd, 'var(--c-debt)'); seg('hb-sa', 1 - fs, fs, 'var(--c-save)');
+    seg('hb-de', 0, 0); seg('hb-sa', 0, 0);
     $('#hb-pc').style.left = (h.free > 0 ? Math.min(100, (h.free * (h.elapsed - 0.5) / h.len) / A * 100) : -5) + '%';
   } else for (const id of ['hb-sp', 'hb-gh', 'hb-de', 'hb-sa']) seg(id, 0, 0);
   $('#dialN').innerHTML = note;
+}
+// What this period sets aside before what can be spent (wishes with a date, savings goals, debts).
+function sheetReserve() {
+  const h = UI.hs || homeState(); if (!h || !h.per) return;
+  const rs = h.rs, row = (n, v, act, tab) => `<button class="dline" data-act="${act}"${tab ? ` data-tab="${tab}"` : ''} style="border:0;background:none;width:100%;padding:6px 0;font:inherit;color:inherit;text-align:left"><span>${esc(n)}</span><span class="num">${money0(v)}</span></button>`;
+  openSheet(`<h1>Mis de côté</h1>
+    <div class="note">Cette période (${esc(rangeLabel(h.per))}), sur ton seuil de ${money0(h.amount)} : ${money0(rs.total)} sont mis de côté. Tu peux donc dépenser ${money0(h.free)}${h.inc ? `, plus ${money0(h.inc)} reçus` : ''} : c'est ce que montre l'anneau.</div>
+    <div class="card">${rs.wishes.map(w => row(w.name, w.amt, 'tab', 'wishes')).join('')}${rs.save ? row('Objectifs d\'épargne', rs.save, 'tab', 'goals') : ''}${rs.debt ? row('Dettes', rs.debt, 'tab', 'debts') : ''}</div>
+    <button class="btn ghost block" data-act="close-sheet">Fermer</button>`);
 }
 // The latest finished period whose debts have not been updated yet (shown the day after it ends).
 function pendingReview() {
@@ -1477,29 +1482,31 @@ function pendingReview() {
   if (!p || s.reviewed[p.id] || UI.reviewLater === p.id) return null;
   return p;
 }
+// v1.28: each notice is one line; touching it does the main action, × puts it off when that is possible.
+function bline(text, act, opt = {}) {
+  return `<div class="bline${opt.tone ? ' ' + opt.tone : ''}"><button class="bl-main" data-act="${act}"${opt.id ? ` data-id="${esc(opt.id)}"` : ''}><i></i><span>${text}</span><b>›</b></button>${opt.later ? `<button class="bl-x" data-act="${opt.later}" aria-label="Plus tard">×</button>` : ''}</div>`;
+}
 function renderBanners() {
   const out = [];
-  if (UI.detected && UI.detected.length) out.push(`<div class="banner" style="border-color:var(--accent)"><span><b>${UI.detected.length} dépense${UI.detected.length > 1 ? 's' : ''} détectée${UI.detected.length > 1 ? 's' : ''}</b> dans tes notifications de paiement.</span><button class="btn" data-act="det-open">Voir</button></div>`);
-  if (UI.updateReady) out.push(`<div class="banner" style="border-color:var(--accent)"><span>Une nouvelle version d'Expy est prête.</span><button class="btn" data-act="apply-update">Mettre à jour</button></div>`);
+  if (UI.detected && UI.detected.length) out.push(bline(`${UI.detected.length} dépense${UI.detected.length > 1 ? 's' : ''} détectée${UI.detected.length > 1 ? 's' : ''}`, 'det-open', { tone: 'acc' }));
+  if (UI.updateReady) out.push(bline('Nouvelle version prête : mettre à jour', 'apply-update', { tone: 'acc' }));
   const rv = pendingReview();
   if (rv) {
     const left = rv.amount - reserveFor(rv).total - spentC(itemsIn(rv));
-    out.push(`<div class="banner warn" style="flex-direction:column;align-items:stretch;gap:8px">
-      <span><b>Période du ${esc(shortDate(rv.start))} au ${esc(shortDate(rv.end))} terminée.</b> ${left >= 0 ? `Il te reste ${money(left)} sous le seuil.` : `Seuil dépassé de ${money(-left)}.`} ${S.settings.debts.some(d => d.bal > 0) ? 'As-tu remboursé ta carte ? Mets tes soldes à jour.' : 'Verse la part réservée à tes objectifs.'}</span>
-      <span style="display:flex;gap:8px;justify-content:flex-end"><button class="link" data-act="review-later">Plus tard</button><button class="btn" data-act="review" data-id="${esc(rv.id)}">Mettre à jour</button></span></div>`);
+    out.push(bline('Période terminée : fais ton bilan', 'review', { id: rv.id, later: 'review-later', tone: left >= 0 ? 'warn' : 'bad' }));
   }
   if (!S.settings.profile && !S.settings.profileSkip && (allItems().length || S.settings.periods.length || S.settings.debts.length))
-    out.push(`<div class="banner"><span>Configure ton profil : ta paie et ta répartition donnent ton seuil.</span><span style="display:flex;gap:8px"><button class="link" data-act="pf-later">Plus tard</button><button class="btn" data-act="pf-open">Configurer</button></span></div>`);
+    out.push(bline('Configure ton profil : ta paie donne ton seuil', 'pf-open', { later: 'pf-later' }));
   const hasEx = allItems().some(i => i.ex) || S.settings.debts.some(d => d.ex) || S.settings.wishes.some(w => w.ex) || S.settings.goals.some(g => g.ex);
-  if (hasEx) out.push(`<div class="banner ex"><span>Données d'exemple affichées.</span><button class="link" data-act="clear-demo">Tout effacer</button></div>`);
+  if (hasEx) out.push(bline("Données d'exemple : tout effacer", 'clear-demo'));
   const anyData = allItems().length || S.settings.debts.length;
-  if (!anyData) out.push(`<div class="banner"><span>Pour voir l'outil rempli, charge des dépenses et des dettes d'exemple.</span><button class="link" data-act="load-demo">Exemple</button></div>`);
-  if (UI.installEvt && !isStandalone()) out.push(`<div class="banner"><span>Installe l'app pour l'ouvrir d'un toucher depuis l'écran d'accueil.</span><button class="link" data-act="install">Installer</button></div>`);
+  if (!anyData) out.push(bline("Voir l'outil rempli avec un exemple", 'load-demo'));
+  if (UI.installEvt && !isStandalone()) out.push(bline("Installer l'app sur l'écran d'accueil", 'install'));
   const real = allItems().filter(i => !i.ex);
   if (real.length) {
     const last = S.settings.lastExport ? new Date(S.settings.lastExport).getTime() : 0;
     const first = Math.min(...real.map(i => new Date(i.ts).getTime()));
-    if (Date.now() - last > 30 * 864e5 && Date.now() - first > 7 * 864e5) out.push(`<div class="banner warn"><span>Tes données sont sur ce téléphone seulement. Exporte une sauvegarde ce mois-ci.</span><button class="link" data-act="export-json">Exporter</button></div>`);
+    if (Date.now() - last > 30 * 864e5 && Date.now() - first > 7 * 864e5) out.push(bline('Exporte une sauvegarde ce mois-ci', 'export-json', { tone: 'warn' }));
   }
   $('#banners').innerHTML = out.join('');
 }
@@ -2496,7 +2503,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.27.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.28.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -3041,6 +3048,7 @@ document.addEventListener('click', (e) => {
     case 'person-new': sheetPerson(); break;
     case 'share-open': sheetShare(t.dataset.id); break;
     case 'goals': showTab('goals'); break;
+    case 'reserve-info': sheetReserve(); break;
     case 'haptic': S.settings.haptic = +t.dataset.v; persist('settings'); buzz('hit'); renderSettings(); break;
     case 'haptic-test': {
       // Diagnostic: one long, unmistakable pulse, bypassing the Effects setting, and what the browser answered.
