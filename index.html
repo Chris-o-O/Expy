@@ -1305,19 +1305,27 @@ function tween(ms, ease, step, done) {
 }
 // v1.29: the ring is the whole threshold (plus money received). Its black part is everything the period already
 // takes: debts and wishes set aside, savings, then spending. Each kind can be shown in its own pastel (boxes under the ring).
-const dialScale = (h) => h.amount + h.inc;
+// With a profile, the debt and savings shares come out of the pay before the threshold: the ring shows them too,
+// so it covers the whole pay for the period (one pay when the period follows the pay schedule, prorated otherwise).
+function payShares(h) {
+  const pf = S.settings.profile; if (!pf || !h || !h.per) return { debt: 0, save: 0 };
+  const n = PAY_FREQ[pf.freq][1], k = h.len * n / 365.25, f = Math.abs(k - 1) < .08 ? 1 : k;
+  return { debt: S.settings.debts.some(d => d.bal > 0) ? Math.round((pf.debt || 0) * f) : 0, save: Math.round((pf.save || 0) * f) };
+}
+const partVals = (h, spend) => { const ps = payShares(h); return { debt: h.rs.debt + ps.debt, wish: h.rs.wish, save: h.rs.save + ps.save, spend }; };
+const dialScale = (h) => { const ps = payShares(h); return h.amount + h.inc + ps.debt + ps.save; };
 const PARTS = [['debt', 'Dettes', 'var(--c-debt)'], ['wish', 'Souhaits', 'var(--c-wish)'], ['save', 'Épargne', 'var(--c-save)'], ['spend', 'Dépenses', 'var(--c-spend)']];
 function dialParts(h, view) {
   const A = dialScale(h), show = S.settings.ringShow, rs = h.rs;
   const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)';
-  const val = { debt: rs.debt, wish: rs.wish, save: rs.save, spend: view };
+  const val = partVals(h, view), before = val.debt + val.wish + val.save;
   let a = 0; const out = [];
   for (const [k, , col] of PARTS) { const l = Math.min(Math.max(0, val[k]) / A, 1 - a); out.push({ k, a, l, col: show[k] ? col : hot }); a += l; }
-  return { A, parts: out, end: a, pace: h.free > 0 ? Math.min(1, (rs.total + h.free * (h.elapsed - 0.5) / h.len) / A) : null };
+  return { A, parts: out, end: a, before, pace: h.free > 0 ? Math.min(1, (before + h.free * (h.elapsed - 0.5) / h.len) / A) : null };
 }
 // Point on the dial where spending now ends (ring head, or the bar when the keyboard is up).
 function dialTarget(spent) {
-  const h = UI.hs, A = h && h.per ? dialScale(h) : 0, f = A ? Math.min((h.rs.total + spent) / A, 1) : 0;
+  const h = UI.hs, d = h && h.per ? dialParts(h, spent) : null, A = d ? d.A : 0, f = A ? Math.min((d.before + spent) / A, 1) : 0;
   if (document.body.classList.contains('kb')) { const r = $('#hbar').getBoundingClientRect(); return { x: r.left + r.width * f, y: r.top + r.height / 2 }; }
   const r = $('#ring').getBoundingClientRect(), a = f * 2 * Math.PI - Math.PI / 2, rad = r.width * 100 / 240;
   return A ? { x: r.left + r.width / 2 + rad * Math.cos(a), y: r.top + r.height / 2 + rad * Math.sin(a) } : { x: r.left + r.width / 2, y: r.top + r.height / 2 };
@@ -1440,7 +1448,7 @@ function renderSummary() {
   const lg = $('#legend'), st = $('#stats3');
   st.innerHTML = '';
   if (h.per) {
-    const val = { debt: h.rs.debt, wish: h.rs.wish, save: h.rs.save, spend: h.spent }, show = S.settings.ringShow;
+    const val = partVals(h, h.spent), show = S.settings.ringShow;
     lg.hidden = false;
     lg.innerHTML = PARTS.filter(([k]) => k === 'spend' || val[k] > 0).map(([k, l, col]) => `<button type="button" class="bk" data-act="ring-show" data-part="${k}" aria-pressed="${show[k]}" style="--bk:${col}"><span class="box" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>${l} <span class="num">${money0(val[k])}</span></button>`).join('');
   } else {
@@ -1487,7 +1495,7 @@ function renderRing() {
       note = `<span class="${left < 0 ? 'bad' : 'muted'}">${left < 0 ? 'dépassé de ' + money0(-left) : 'reste <b>' + money0(left) + '</b>'}</span>`
         + (left > 0 && h.daysLeft > 0 ? `<span class="muted"> · ${money0(left / h.daysLeft)}/jour</span>` : '');
     }
-    label = `${Math.round((rs.total + h.spent) / A * 100)} % du seuil pris : ${money0(h.spent)} dépensés${rs.total ? `, ${money0(rs.total)} mis de côté` : ''}`;
+    label = `${Math.round(end / 1 * 100)} % de la période pris : ${money0(h.spent)} dépensés${end * A - h.spent > 50 ? `, ${money0(end * A - (UI.ringView ?? h.spent))} pour dettes, souhaits et épargne` : ''}`;
   } else {
     note = `<span class="muted">${esc(h.label)} : ${money0(h.spent)}</span>`; label = 'Aucune période définie';
   }
@@ -2530,7 +2538,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.29.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.29.1${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
