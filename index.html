@@ -1803,8 +1803,13 @@ function accountsCard() {
   const assets = s.accounts.reduce((a, x) => a + x.bal, 0), debt = cards.reduce((a, d) => a + d.bal, 0);
   const upd = [...s.accounts, ...s.debts].map(x => (x.updated || '').slice(0, 10)).filter(Boolean).sort().pop();
   const since = (x) => allItems().filter(i => i.via === x.id).reduce((a, i) => a + chargeOf(i), 0);
+  // Wish envelopes live in the pay account: what is already in them, plus this period's reserve (the pay is in).
+  const pa = s.profile && s.accounts.find(a => a.id === s.profile.payAcc) || s.accounts.find(a => a.kind === 'cheque') || s.accounts[0];
+  const per = activePeriod(), held = s.wishes.reduce((a, w) => a + Math.min(w.saved || 0, w.price), 0) + (per ? reserveFor(per).wish : 0);
   return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Mes comptes</h2><button class="link" data-act="pf-open" data-step="2">Mettre à jour</button></div>
-    ${s.accounts.map(a => `<div class="dline"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span></div>`).join('')}
+    ${s.accounts.map(a => a === pa && held > 0 ? `<div class="dline acc-card"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span>
+      <span class="d">dont <b style="color:var(--fg)">${money0(held)}</b> pour tes souhaits · ${money0(a.bal - held)} libres</span></div>`
+      : `<div class="dline"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span></div>`).join('')}
     ${cards.map(d => { const n = since(d); return `<div class="dline acc-card"><span>${esc(d.name)}${d.id === src ? ' <span class="tag">dépenses</span>' : ''}</span><span class="num">−${money0(d.bal)}</span>
       ${n ? `<span class="d">dont ${money0(n)} de dépenses saisies depuis le ${esc(shortDate((d.updated || '').slice(0, 10) || todayISO()))}</span>` : ''}
       <button class="btn ghost sm" data-act="card-pay" data-id="${esc(d.id)}">Payer</button></div>`; }).join('')}
@@ -2540,7 +2545,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.29.2${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.29.3${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
