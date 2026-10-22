@@ -162,6 +162,8 @@ body.kb .amount .cur { font-size: 7cqw; }
 .legend .bk[aria-pressed="true"] { border-color: var(--bk); color: var(--fg); }
 .legend .bk[aria-pressed="true"] .box { background: var(--bk); border-color: var(--bk); }
 .legend .bk[aria-pressed="true"] .box svg { opacity: 1; }
+.dline .resv { display: inline-block; margin: 4px 0 0; background: var(--c-wish); color: #0A0A0A; border-radius: 999px; padding: 3px 10px; font-size: 12.5px; font-weight: 700; }
+.dline .d .resv:not(:first-child) { margin-left: 0; display: table; }
 .gainpill { display: block; margin: 0 auto; border: 0; border-radius: 999px; background: var(--p4); color: #0E5A2E; font: inherit; font-size: 14px; font-weight: 700; padding: 7px 16px; }
 .gainpill b { font-weight: 800; color: #0A0A0A; }
 .gainpill[hidden] { display: none; }
@@ -1805,10 +1807,11 @@ function accountsCard() {
   const since = (x) => allItems().filter(i => i.via === x.id).reduce((a, i) => a + chargeOf(i), 0);
   // Wish envelopes live in the pay account: what is already in them, plus this period's reserve (the pay is in).
   const pa = s.profile && s.accounts.find(a => a.id === s.profile.payAcc) || s.accounts.find(a => a.kind === 'cheque') || s.accounts[0];
-  const per = activePeriod(), held = s.wishes.reduce((a, w) => a + Math.min(w.saved || 0, w.price), 0) + (per ? reserveFor(per).wish : 0);
+  // Envelopes = already filled (past periods); the current period's reserve shows apart until the period ends.
+  const per = activePeriod(), held = s.wishes.reduce((a, w) => a + Math.min(w.saved || 0, w.price), 0), now = per ? reserveFor(per).wish : 0;
   return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Mes comptes</h2><button class="link" data-act="pf-open" data-step="2">Mettre à jour</button></div>
-    ${s.accounts.map(a => a === pa && held > 0 ? `<div class="dline acc-card"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span>
-      <span class="d">dont <b style="color:var(--fg)">${money0(held)}</b> pour tes souhaits · ${money0(a.bal - held)} libres</span></div>`
+    ${s.accounts.map(a => a === pa && (held > 0 || now > 0) ? `<div class="dline acc-card"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span>
+      <span class="d">${held > 0 ? `dont ${money0(held)} attribués à tes souhaits` : ''}${now > 0 ? `<span class="resv">${money0(now)} réservés pour tes souhaits cette période</span>` : ''}</span></div>`
       : `<div class="dline"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span></div>`).join('')}
     ${cards.map(d => { const n = since(d); return `<div class="dline acc-card"><span>${esc(d.name)}${d.id === src ? ' <span class="tag">dépenses</span>' : ''}</span><span class="num">−${money0(d.bal)}</span>
       ${n ? `<span class="d">dont ${money0(n)} de dépenses saisies depuis le ${esc(shortDate((d.updated || '').slice(0, 10) || todayISO()))}</span>` : ''}
@@ -2545,7 +2548,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.29.3${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.29.4${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
