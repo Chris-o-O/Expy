@@ -1521,6 +1521,12 @@ function pendingReview() {
   if (!p || s.reviewed[p.id] || UI.reviewLater === p.id) return null;
   return p;
 }
+function envelopeGap() {
+  const s = S.settings, pa = s.profile && s.accounts.find(a => a.id === s.profile.payAcc) || s.accounts.find(a => a.kind === 'cheque') || s.accounts[0];
+  if (!pa) return null;
+  const held = s.wishes.reduce((a, w) => a + Math.min(w.saved || 0, w.price), 0);
+  return held > 0 && held > pa.bal && s.envAck !== held ? { held, acc: pa } : null;
+}
 // v1.28: each notice is one line; touching it does the main action, × puts it off when that is possible.
 function bline(text, act, opt = {}) {
   return `<div class="bline${opt.tone ? ' ' + opt.tone : ''}"><button class="bl-main" data-act="${act}"${opt.id ? ` data-id="${esc(opt.id)}"` : ''}><i></i><span>${text}</span><b>›</b></button>${opt.later ? `<button class="bl-x" data-act="${opt.later}" aria-label="Plus tard">×</button>` : ''}</div>`;
@@ -1534,6 +1540,9 @@ function renderBanners() {
     const left = rv.amount - reserveFor(rv).total - spentC(itemsIn(rv));
     out.push(bline('Période terminée : fais ton bilan', 'review', { id: rv.id, later: 'review-later', tone: left >= 0 ? 'warn' : 'bad' }));
   }
+  // Envelopes say more is set aside for wishes than the pay account holds: ask to check (cash, an account not in Expy…).
+  const ew = envelopeGap();
+  if (ew) out.push(bline(`Souhaits : ${money0(ew.held)} attribués, mais ${esc(ew.acc.name)} affiche ${money0(ew.acc.bal)}. Vérifie tes soldes`, 'pf-open', { later: 'env-ack', tone: 'warn', id: '' }).replace('data-act="pf-open"', 'data-act="pf-open" data-step="2"'));
   if (!S.settings.profile && !S.settings.profileSkip && (allItems().length || S.settings.periods.length || S.settings.debts.length))
     out.push(bline('Configure ton profil : ta paie donne ton seuil', 'pf-open', { later: 'pf-later' }));
   const hasEx = allItems().some(i => i.ex) || S.settings.debts.some(d => d.ex) || S.settings.wishes.some(w => w.ex) || S.settings.goals.some(g => g.ex);
@@ -2548,7 +2557,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.29.4${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.29.5${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -3094,6 +3103,7 @@ document.addEventListener('click', (e) => {
     case 'share-open': sheetShare(t.dataset.id); break;
     case 'goals': showTab('goals'); break;
     case 'pace-info': if (!nativeOn() && !amtCents()) window.showPace(t); break;
+    case 'env-ack': { const g = envelopeGap(); if (g) { S.settings.envAck = g.held; persist('settings'); } renderBanners(); break; }
     case 'ring-show': { const k = t.dataset.part, sh = S.settings.ringShow; sh[k] = !sh[k]; persist('settings'); buzz('tile'); renderSummary(); break; }
     case 'haptic': S.settings.haptic = +t.dataset.v; persist('settings'); buzz('hit'); renderSettings(); break;
     case 'haptic-test': {
