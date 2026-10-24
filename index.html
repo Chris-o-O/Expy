@@ -1813,7 +1813,8 @@ function accountsCard() {
   const cards = s.debts.filter(d => d.bal > 0), src = spendSource();
   const assets = s.accounts.reduce((a, x) => a + x.bal, 0), debt = cards.reduce((a, d) => a + d.bal, 0);
   const upd = [...s.accounts, ...s.debts].map(x => (x.updated || '').slice(0, 10)).filter(Boolean).sort().pop();
-  const since = (x) => allItems().filter(i => i.via === x.id).reduce((a, i) => a + chargeOf(i), 0);
+  // Only what was charged after the balance was last confirmed (older charges are already in that balance).
+  const since = (x) => allItems().filter(i => i.via === x.id && !(x.updated && i.ts <= localEnd(x.updated))).reduce((a, i) => a + chargeOf(i), 0);
   // Wish envelopes live in the pay account: what is already in them, plus this period's reserve (the pay is in).
   const pa = s.profile && s.accounts.find(a => a.id === s.profile.payAcc) || s.accounts.find(a => a.kind === 'cheque') || s.accounts[0];
   // Envelopes = already filled (past periods); the current period's reserve shows apart until the period ends.
@@ -2557,7 +2558,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.29.5${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.29.6${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
