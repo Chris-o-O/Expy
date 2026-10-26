@@ -117,7 +117,7 @@ h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacin
 #v-home { gap: 8px; }
 .homehead .per { font-size: 13px; font-weight: 700; color: var(--muted); border: 0; background: transparent; padding: 0; }
 .daypill { font-size: 12px; font-weight: 800; background: var(--fg); color: var(--bg); padding: 5px 11px; border-radius: 999px; }
-:root { --c-debt: var(--p1); --c-save: var(--p2); --c-wish: var(--p3); --c-spend: var(--p5); --mo-ms: 920ms; --mo-ease: cubic-bezier(.65,0,.35,1); }
+:root { --c-hot: #FF7A1A; --c-debt: var(--p1); --c-save: var(--p2); --c-wish: var(--p3); --c-spend: var(--p5); --mo-ms: 920ms; --mo-ease: cubic-bezier(.65,0,.35,1); }
 .dial { --ring: min(222px, 26vh); --ring: min(222px, 26dvh); position: relative; width: var(--ring); height: var(--ring); margin: 0 auto; container-type: inline-size; flex: none; max-width: 100%; transition: width var(--mo-ms) var(--mo-ease), height var(--mo-ms) var(--mo-ease); }
 .dial > svg { position: absolute; left: 50%; top: 0; width: var(--ring); height: var(--ring); margin-left: calc(var(--ring) / -2); display: block; transition: opacity .22s, transform var(--mo-ms) var(--mo-ease); transform-origin: 50% 100%; }
 /* Keyboard open: the ring flattens into a bar, the amount grows */
@@ -220,11 +220,11 @@ body.nofx .fab, body.nofx .keypad .add, body.nofx .tile { transition: none; }
 .toggle.inc-t[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); }
 .toggle.inc-t[aria-pressed="true"] .sw { background: var(--ok); }
 /* Selected category: its name in a small pill under the tile (v1.21). */
-.tiles { padding-bottom: 10px; }
+.tiles { padding-bottom: 10px; padding-top: 4px; }
 .tile { position: relative; -webkit-touch-callout: none; user-select: none; }
-.tile[aria-pressed="true"]::after { content: attr(data-name); position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); z-index: 2; max-width: 120%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--accent); color: var(--accent-fg); font: 800 10.5px var(--f-ui); padding: 2px 8px; border-radius: 999px; pointer-events: none; }
+.tile[aria-pressed="true"]::after { content: attr(data-name); position: absolute; left: 50%; bottom: -12px; transform: translateX(-50%); z-index: 2; max-width: 120%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--accent); color: var(--accent-fg); font: 800 10.5px var(--f-ui); padding: 2px 8px; border-radius: 999px; pointer-events: none; }
 /* Long-press a tile and slide: a bubble names the tile under the finger. */
-.tile.hover { transform: scale(1.1); box-shadow: 0 0 0 3px var(--accent); }
+.tile.hover { transform: scale(1.1); } .tile.hover .ico { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5.5px var(--accent); }
 .tile-bubble { position: fixed; z-index: 70; transform: translate(-50%, -100%); display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 999px; background: var(--fg); color: var(--bg); font: 800 16px var(--f-ui); white-space: nowrap; pointer-events: none; box-shadow: 0 10px 26px rgba(0,0,0,.3); }
 .tile-bubble[hidden] { display: none; }
 .tile-bubble .ico { width: 30px; height: 30px; } .tile-bubble .ico svg { width: 18px; height: 18px; }
@@ -270,10 +270,10 @@ body.kb .wrap { padding-bottom: 16px; }
 /* Category tiles with icons: two rows, scroll sideways */
 .tiles { display: grid; grid-template-rows: repeat(2, 52px); grid-auto-flow: column; grid-auto-columns: calc((100% - 32px) / 5); gap: 13px 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; }
 .tiles::-webkit-scrollbar { display: none; }
-.tile { scroll-snap-align: start; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 18px; background: var(--surface); padding: 0; min-width: 0; }
-.tile .ico { width: 34px; height: 34px; }
-.tile .ico svg { width: 20px; height: 20px; }
-.tile[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.tile { scroll-snap-align: start; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 18px; background: transparent; padding: 0; min-width: 0; }
+.tile .ico { width: 44px; height: 44px; transition: box-shadow .15s; }
+.tile .ico svg { width: 24px; height: 24px; }
+.tile[aria-pressed="true"] .ico { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5.5px var(--fg); }
 .ico { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; flex: none; }
 .ico svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .opts-row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
@@ -1321,7 +1321,7 @@ const dialScale = (h) => { const ps = payShares(h); return h.amount + h.inc + ps
 const PARTS = [['debt', 'Dettes', 'var(--c-debt)'], ['wish', 'Souhaits', 'var(--c-wish)'], ['save', 'Épargne', 'var(--c-save)'], ['spend', 'Dépenses', 'var(--c-spend)']];
 function dialParts(h, view) {
   const A = dialScale(h), show = S.settings.ringShow, rs = h.rs;
-  const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--warn)' : 'var(--fg)';
+  const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--c-hot)' : 'var(--fg)';
   const val = partVals(h, view), before = val.debt + val.wish + val.save;
   let a = 0; const out = [];
   for (const [k, , col] of PARTS) { const l = Math.min(Math.max(0, val[k]) / A, 1 - a); out.push({ k, a, l, col: show[k] ? col : hot }); a += l; }
@@ -1484,7 +1484,7 @@ function renderRing() {
     for (const p of parts) { if (p.l <= 0.0004) continue; const r = runs[runs.length - 1]; if (r && r.col === p.col && Math.abs(r.a + r.l - p.a) < 1e-6) r.l += p.l; else runs.push({ a: p.a, l: p.l, col: p.col }); }
     const dot = (f, col) => { const g = f * 2 * Math.PI - Math.PI / 2; return `<circle cx="${(120 + 100 * Math.cos(g)).toFixed(1)}" cy="${(120 + 100 * Math.sin(g)).toFixed(1)}" r="10" style="fill:${esc(col)}"/>`; };
     for (const r of runs) svg += arc(r.a, r.l, r.col);
-    if (runs.length) svg += dot(0, runs[0].col) + dot(end, runs[runs.length - 1].col);
+    if (runs.length && end < .995) svg += dot(0, runs[0].col) + dot(end, runs[runs.length - 1].col);
     if (e > 0) svg += arc(end, Math.min(e / A, 1 - end), catById(UI.cat).color, 'round');
     if (pace != null) {
       const ang = pace * 2 * Math.PI - Math.PI / 2, cx = Math.cos(ang), cy = Math.sin(ang);
@@ -2558,7 +2558,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.29.6${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.30.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 

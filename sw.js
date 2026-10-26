@@ -1,6 +1,6 @@
 // Offline cache for Expy. Bump VERSION whenever a file changes: phones then install the new
 // version in the background, and the app offers a one-tap "Mettre à jour".
-const VERSION = 'expy-v1.29.6';
+const VERSION = 'expy-v1.30.0';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'fonts/bricolage.woff2', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'];
 
 self.addEventListener('install', (e) => {
