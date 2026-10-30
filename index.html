@@ -2558,7 +2558,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.30.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.31.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -2830,12 +2830,31 @@ function sheetReview(pid) {
   const pf = s.profile, pa = pf && (s.accounts.find(a => a.id === pf.payAcc) || s.accounts.find(a => a.kind === 'cheque'));
   const sa = pf && pa && (s.accounts.find(a => a.id === pf.saveAcc && a.id !== pa.id) || (pf.saveAcc === undefined ? s.accounts.find(a => a.kind === 'epargne' && a.id !== pa.id) : null));
   const dep = pa && !p.deposited ? { pa, sa, on: !pa.updated || pa.updated.slice(0, 10) < p.start } : null;
+  // The period in short: how many expenses, average, main category, biggest one, share doable at home, vs the period before.
+  const its = itemsIn(p), n = its.length, tot = sumC(its);
+  let recap = '';
+  if (n) {
+    const byCat = {}; for (const i of its) byCat[i.cat] = (byCat[i.cat] || 0) + i.amt;
+    const [tc, ta] = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0], top = catById(tc);
+    const big = its.slice().sort((a, b) => b.amt - a.amt)[0], homeC = sumC(its.filter(i => i.home));
+    const prev = s.periods.filter(x => x.end < p.start).sort((a, b) => b.end.localeCompare(a.end))[0], pt = prev ? sumC(itemsIn(prev)) : 0;
+    const diff = prev && pt ? Math.round((tot - pt) / pt * 100) : null;
+    recap = `<div class="card"><h2>Ta période en bref</h2><div class="kv">
+      <div><span class="k">Dépenses</span><span class="v num">${n}</span></div>
+      <div><span class="k">En moyenne</span><span class="v num">${money0(tot / n)}</span></div>
+      <div><span class="k">Par jour</span><span class="v num">${money0(tot / periodLen(p))}</span></div></div>
+      <div class="dline"><span><span class="dot" style="background:${esc(top.color)};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px"></span>Principal poste : ${esc(top.name)}</span><span class="num">${money0(ta)} · ${Math.round(ta / tot * 100)} %</span></div>
+      <div class="dline"><span>Plus grosse dépense : ${esc(catById(big.cat).name)}${big.note ? ' · ' + esc(big.note) : ''}</span><span class="num">${money0(big.amt)}</span></div>
+      ${homeC ? `<div class="dline"><span>Faisable à la maison</span><span class="num">${money0(homeC)} · ${Math.round(homeC / tot * 100)} %</span></div>` : ''}
+      ${diff != null ? `<div class="note">${diff === 0 ? 'Autant que' : diff > 0 ? `${diff} % de plus que` : `${-diff} % de moins que`} la période d'avant (${money0(pt)}).</div>` : ''}</div>`;
+  }
   openSheet(`<h1>Fin de période</h1>
     <div class="card"><div class="kv">
       <div><span class="k">Dépensé</span><span class="v num">${money0(spent)}</span></div>
       <div><span class="k">Seuil</span><span class="v num">${money0(p.amount)}</span></div>
       <div><span class="k">${left >= 0 ? 'Reste' : 'Dépassé'}</span><span class="v num" style="color:${left >= 0 ? 'var(--ok)' : 'var(--bad)'}">${money0(Math.abs(left))}</span></div>
     </div><div class="note">Du ${esc(shortDate(p.start, true))} au ${esc(shortDate(p.end, true))}.${rs.total ? ` Réservé : ${money0(rs.total)} (${[rs.debt ? 'dettes' : '', rs.save ? 'épargne' : '', rs.wish ? 'souhaits' : ''].filter(Boolean).join(', ')}).` : ''}${p.envIn ? ` ${money0(p.envIn)} versés dans tes enveloppes de souhaits.` : ''}</div></div>
+    ${recap}
     <form class="form" id="rvForm">
       ${s.profile ? `<label>Paie reçue pour cette période ($)<input class="field num" id="rvPay" inputmode="decimal" value="${esc(toInputMoney(p.paid ?? s.profile.pay))}"></label>
       <div class="note">Change-la si ta paie était différente : l'indice de confiance s'en sert.</div>` : ''}
@@ -2843,7 +2862,7 @@ function sheetReview(pid) {
       ${active.length ? `<div class="note">Indique le solde de chaque dette aujourd'hui, d'après ton relevé ou ton appli bancaire.</div>` : ''}
       ${active.map(d => `<label>${esc(d.name)} · solde avant : ${money(d.bal)}<input class="field num" id="rv-${esc(d.id)}" data-debt="${esc(d.id)}" inputmode="decimal" value="${esc(toInputMoney(d.bal))}"></label>`).join('')}
       ${payC > 0 && pd ? `<button type="button" class="btn ghost" id="rvApply">Déduire ${money0(payC)} de ${esc(pd.name)}${rs.debt ? ' (reste + réserve)' : ''}</button>` : ''}
-      ${rs.need > 0 ? `<label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="rvSave" checked>Verser ${money0(rs.need)} à mes objectifs d'épargne</label>` : ''}
+      ${rs.need > 0 ? `<label class="chk" style="font-size:14px;color:var(--fg)"><input type="checkbox" id="rvSave" checked>Verser ${money0(rs.need)} à mes objectifs d'épargne</label>${rs.goals.length > 1 ? `<div class="note">${rs.goals.map(g => `${esc(g.name)} : ${money0(g.amt)}`).join(' · ')}</div>` : ''}` : ''}
       <div class="warntext" id="rvErr" hidden></div>
       <button class="btn block" type="submit">Enregistrer les soldes</button>
       <button class="btn ghost block" type="button" id="rvNone">Rien à changer</button>
@@ -3070,9 +3089,14 @@ document.addEventListener('click', (e) => {
     case 'inc-del': removeIncome(t.dataset.id, true); break;
     case 'toggle-opts': UI.optsOpen = !UI.optsOpen; $('#opts').hidden = !UI.optsOpen; t.setAttribute('aria-expanded', String(UI.optsOpen)); break;
     case 'tab': {
-      // The central "+" goes straight to typing with the device keyboard (needs this tap to focus the field).
+      // The central "+": one tap shows Saisie (to look at the ring), a quick second tap also opens the device keyboard
+      // (that tap is what lets the field take focus).
       showTab(t.dataset.tab);
-      if (t.dataset.tab === 'home' && t.closest('.tabs') && canKb() && !nativeOn()) startNative();
+      if (t.dataset.tab === 'home' && t.closest('.tabs')) {
+        const now = Date.now(), dbl = now - (UI.plusTap || 0) < 400;
+        UI.plusTap = dbl ? 0 : now;
+        if (dbl && canKb() && !nativeOn()) startNative();
+      }
       break;
     }
     case 'kb-close': endNative(false); break;
