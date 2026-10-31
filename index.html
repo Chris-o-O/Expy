@@ -304,7 +304,7 @@ body.kb .wrap { padding-bottom: 16px; }
 .row .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .row .t { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .d { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .amt { font-weight: 800; }
+.row .amt { font-weight: 800; flex: none; white-space: nowrap; }
 .tag { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; }
 .tag.home { color: var(--home); border: 1px solid var(--home); }
 .tag.ex { color: var(--muted); border: 1px dashed var(--muted); }
@@ -316,6 +316,7 @@ body.kb .wrap { padding-bottom: 16px; }
 .stack > li { border-radius: 24px; overflow: hidden; color: #0A0A0A; --fg: #0A0A0A; --muted: #4A4A4A; --ok: #0E6B38; --bad: #B3261E; --line: rgba(10,10,10,.14); --bg: #fff; }
 /* v1.29: one pastel per kind, everywhere (debts pink, savings yellow, wishes blue, spending violet). */
 .stack > li { background: var(--p3); }
+.card.k-acc { background: var(--p6); color: #0A0A0A; --fg: #0A0A0A; --muted: #3F4D4C; --ok: #0E6B38; --bad: #B3261E; --line: rgba(10,10,10,.14); --surface-2: rgba(10,10,10,.08); --accent: #1F3BB8; --bg: #fff; cursor: pointer; }
 .stack.k-debts > li, .stack > li.k-debts { background: var(--c-debt); }
 .stack.k-goals > li, .stack > li.k-goals { background: var(--c-save); }
 .stack.k-wishes > li, .stack > li.k-wishes { background: var(--c-wish); }
@@ -337,7 +338,8 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 .tag.share { color: var(--accent); border: 1px solid var(--accent); }
 .toggle.sm { padding: 5px 12px 5px 8px; }
 /* Dashboard + goals */
-.dline { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; margin-top: 8px; font-size: 13.5px; font-weight: 700; width: 100%; }
+.dline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 10px; margin-top: 8px; font-size: 13.5px; font-weight: 700; width: 100%; }
+.dline > span:first-child { min-width: 0; overflow-wrap: anywhere; } .dline .num, .stat .num { white-space: nowrap; }
 .dline .d { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--muted); }
 .dline .meter { grid-column: 1 / -1; height: 5px; margin-top: 3px; }
 .dline.pfrow { grid-template-columns: 1fr auto auto; align-items: center; }
@@ -370,10 +372,10 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 .btn.danger { background: transparent; color: var(--bad); border: 1.5px solid var(--bad); }
 .btn.block { width: 100%; padding: 14px; }
 .btn:disabled { opacity: .4; }
-.kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; container-type: inline-size; }
 .kv > div { min-width: 0; display: flex; flex-direction: column; }
 .kv .k { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 700; }
-.kv .v { font-size: 18px; font-weight: 800; overflow-wrap: anywhere; }
+.kv .v { font-size: clamp(14px, 5.6cqi, 18px); font-weight: 800; overflow-wrap: anywhere; }
 .free { display: flex; flex-direction: column; gap: 2px; }
 .free .v { font-size: 46px; font-weight: 800; letter-spacing: -.04em; line-height: 1.05; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-radius: 999px; padding: 4px; gap: 4px; }
@@ -384,8 +386,8 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 .range { width: 100%; accent-color: var(--accent); }
 .debt { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; width: 100%; text-align: left; background: transparent; border: 0; }
 .debt .l1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.debt .name { font-weight: 800; font-size: 18px; display: flex; gap: 8px; align-items: center; min-width: 0; }
-.debt .bal { font-size: 24px; font-weight: 800; letter-spacing: -.03em; }
+.debt .name { font-weight: 800; font-size: 18px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+.debt .bal { font-size: 24px; font-weight: 800; letter-spacing: -.03em; white-space: nowrap; flex: none; }
 .debt .l2 { font-size: 12.5px; font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .debt .warnline { font-size: 12.5px; color: var(--bad); font-weight: 600; }
 .note { font-size: 12.5px; color: var(--muted); }
@@ -421,7 +423,7 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 .wish .w-env { font-size: 13px; color: var(--muted); font-weight: 600; }
 .wish .meter { width: 100%; margin-top: 2px; }
 .wish .w-side { display: flex; align-items: center; gap: 2px; }
-.wish .w-price { font-weight: 800; font-size: 24px; letter-spacing: -.03em; margin-right: 6px; }
+.wish .w-price { font-weight: 800; font-size: 24px; letter-spacing: -.03em; margin-right: 6px; white-space: nowrap; }
 .rate .v { font-size: 38px; font-weight: 800; letter-spacing: -.04em; line-height: 1.1; }
 
 /* Settings */
@@ -1819,7 +1821,7 @@ function accountsCard() {
   const pa = s.profile && s.accounts.find(a => a.id === s.profile.payAcc) || s.accounts.find(a => a.kind === 'cheque') || s.accounts[0];
   // Envelopes = already filled (past periods); the current period's reserve shows apart until the period ends.
   const per = activePeriod(), held = s.wishes.reduce((a, w) => a + Math.min(w.saved || 0, w.price), 0), now = per ? reserveFor(per).wish : 0;
-  return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Mes comptes</h2><button class="link" data-act="pf-open" data-step="2">Mettre à jour</button></div>
+  return `<div class="card k-acc" data-act="open-set" data-s="profil" role="button" aria-label="Mes comptes : ouvrir les réglages du profil"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Mes comptes</h2><button class="link" data-act="pf-open" data-step="2">Mettre à jour</button></div>
     ${s.accounts.map(a => a === pa && (held > 0 || now > 0) ? `<div class="dline acc-card"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span>
       <span class="d">${held > 0 ? `dont ${money0(held)} attribués à tes souhaits` : ''}${now > 0 ? `<span class="resv">${money0(now)} réservés pour tes souhaits cette période</span>` : ''}</span></div>`
       : `<div class="dline"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span></div>`).join('')}
@@ -2558,7 +2560,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.31.1${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.32.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
