@@ -2558,7 +2558,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.31.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.31.1${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -3089,13 +3089,14 @@ document.addEventListener('click', (e) => {
     case 'inc-del': removeIncome(t.dataset.id, true); break;
     case 'toggle-opts': UI.optsOpen = !UI.optsOpen; $('#opts').hidden = !UI.optsOpen; t.setAttribute('aria-expanded', String(UI.optsOpen)); break;
     case 'tab': {
-      // The central "+": one tap shows Saisie (to look at the ring), a quick second tap also opens the device keyboard
-      // (that tap is what lets the field take focus).
+      // The central "+": from another tab, one tap shows Saisie (to look at the ring) and a quick second tap also opens
+      // the device keyboard; already on Saisie, one tap opens it (that tap is what lets the field take focus).
+      const was = UI.tab;
       showTab(t.dataset.tab);
       if (t.dataset.tab === 'home' && t.closest('.tabs')) {
         const now = Date.now(), dbl = now - (UI.plusTap || 0) < 400;
-        UI.plusTap = dbl ? 0 : now;
-        if (dbl && canKb() && !nativeOn()) startNative();
+        UI.plusTap = dbl || was === 'home' ? 0 : now;
+        if ((dbl || was === 'home') && canKb() && !nativeOn()) startNative();
       }
       break;
     }
