@@ -316,6 +316,15 @@ body.kb .wrap { padding-bottom: 16px; }
 .stack > li { border-radius: 24px; overflow: hidden; color: #0A0A0A; --fg: #0A0A0A; --muted: #4A4A4A; --ok: #0E6B38; --bad: #B3261E; --line: rgba(10,10,10,.14); --bg: #fff; }
 /* v1.29: one pastel per kind, everywhere (debts pink, savings yellow, wishes blue, spending violet). */
 .stack > li { background: var(--p3); }
+.stack > li.k-acc { background: var(--p6); }
+.top-pills { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.top-pills .nw { margin: 0; display: flex; flex-direction: column; gap: 2px; padding: 14px 18px; }
+.top-pills .nw .k { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--hero-sub); }
+.top-pills .nw .v { font-size: clamp(22px, 7vw, 28px); font-weight: 800; letter-spacing: -.03em; white-space: nowrap; }
+.top-pills .nw .note { margin: 0; font-size: 12px; }
+.fs-pill { border: 0; border-radius: 24px; background: var(--p4); color: #0A0A0A; padding: 14px 18px; font: inherit; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 4px; min-width: 118px; text-align: left; }
+.fs-pill svg { width: 26px; height: 26px; fill: none; stroke: #0A0A0A; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.fs-pill b { font-size: 16px; font-weight: 800; } .fs-pill span { font-size: 11.5px; font-weight: 600; color: #3F4D4C; }
 .card.k-acc { background: var(--p6); color: #0A0A0A; --fg: #0A0A0A; --muted: #3F4D4C; --ok: #0E6B38; --bad: #B3261E; --line: rgba(10,10,10,.14); --surface-2: rgba(10,10,10,.08); --accent: #1F3BB8; --bg: #fff; cursor: pointer; }
 .stack.k-debts > li, .stack > li.k-debts { background: var(--c-debt); }
 .stack.k-goals > li, .stack > li.k-goals { background: var(--c-save); }
@@ -711,6 +720,7 @@ function normalize(st) {
   if (!Array.isArray(s.periods)) s.periods = [];
   if (!Array.isArray(s.wishes)) s.wishes = [];
   // v1.27: share of the leftover under the threshold that goes to the debts (was a yes/no box in Dettes).
+  if (![0, 1, 3, 6, 12].includes(s.cushionMonths)) s.cushionMonths = 0;
   if (st && st.leftoverPct === undefined && st.leftoverToDebt === false) s.leftoverPct = 0;
   if (![0, 25, 50, 75, 100].includes(s.leftoverPct)) s.leftoverPct = 100;
   delete s.leftoverToDebt;
@@ -1610,7 +1620,7 @@ function renderDash() {
     ${o.rows.length > 4 ? `<span class="l2"><span>+ ${o.rows.length - 4} autre${o.rows.length - 4 > 1 ? 's' : ''}</span></span>` : ''}
   </button></li>`;
   const kinds = [['debts', 'Dettes remboursées', 'Dettes'], ['goals', 'Objectifs', 'Objectifs'], ['wishes', 'Souhaits', 'Souhaits']].filter(k => dd[k[0]]);
-  let body = `<div class="view-head"><h1>Tableau de bord</h1><button class="me-pill" data-act="tab" data-tab="settings" aria-label="Profil et réglages">${avatar(s.name)}<span>${esc(s.name || 'Profil')}</span></button></div>` + accountsCard() + sharesCard();
+  let body = `<div class="view-head"><h1>Tableau de bord</h1><button class="me-pill" data-act="tab" data-tab="settings" aria-label="Profil et réglages">${avatar(s.name)}<span>${esc(s.name || 'Profil')}</span></button></div>` + topPills() + accountsCard() + sharesCard();
   if (!kinds.length) {
     $('#v-dash').innerHTML = body + `<div class="empty">Ajoute une dette, un objectif ou un souhait pour suivre ici leur progression.</div>
       <div class="btn-row" style="justify-content:center"><button class="btn ghost" data-act="tab" data-tab="debts">Dettes</button><button class="btn ghost" data-act="tab" data-tab="goals">Objectifs</button><button class="btn ghost" data-act="tab" data-tab="wishes">Souhaits</button></div>`;
@@ -1810,27 +1820,46 @@ function profileSummary() {
   return `Paie ${money0(pf.pay)} ${PAY_FREQ[pf.freq][0].toLowerCase()}${pf.variable ? ' (variable)' : ''} · fixes ${money0(pfFixed(pf))} · épargne ${money0(pf.save)}${pf.debt ? ' · dettes ' + money0(pf.debt) : ''} · dépenses courantes ${money0(pfSpend(pf))}`;
 }
 // Dashboard: accounts and each card (expenses already on it), with net worth.
-function accountsCard() {
+// Everyday cost per day: average spending of the last 90 days (since the first expense if more recent) plus fixed charges.
+function dailyCost() {
+  const s = S.settings, today = new Date(), from = new Date(today); from.setDate(today.getDate() - 89);
+  const its = allItems().filter(i => !i.ex && new Date(i.ts) >= from);
+  if (!its.length && !s.profile) return 0;
+  const first = its.length ? Math.min(...its.map(i => new Date(i.ts).getTime())) : today.getTime();
+  const days = Math.max(14, Math.min(90, Math.ceil((today - first) / 864e5) + 1));
+  const fixed = s.profile ? pfFixed(s.profile) * PAY_FREQ[s.profile.freq][1] / 365.25 : 0;
+  return spentC(its) / days + fixed;
+}
+const daysLabel = (d) => d < 1 ? "moins d'un jour" : d >= 60 ? `${(d / 30.44).toFixed(d >= 300 ? 0 : 1).replace('.', ',')} mois` : `${Math.floor(d)} jour${Math.floor(d) > 1 ? 's' : ''}`;
+// Dashboard top: net worth (hero) and Foresight side by side.
+function topPills() {
   const s = S.settings; if (!s.accounts.length && !s.debts.some(d => d.bal > 0)) return '';
-  const cards = s.debts.filter(d => d.bal > 0), src = spendSource();
-  const assets = s.accounts.reduce((a, x) => a + x.bal, 0), debt = cards.reduce((a, d) => a + d.bal, 0);
-  const upd = [...s.accounts, ...s.debts].map(x => (x.updated || '').slice(0, 10)).filter(Boolean).sort().pop();
-  // Only what was charged after the balance was last confirmed (older charges are already in that balance).
-  const since = (x) => allItems().filter(i => i.via === x.id && !(x.updated && i.ts <= localEnd(x.updated))).reduce((a, i) => a + chargeOf(i), 0);
-  // Wish envelopes live in the pay account: what is already in them, plus this period's reserve (the pay is in).
+  const assets = s.accounts.reduce((a, x) => a + x.bal, 0), debt = s.debts.reduce((a, d) => a + Math.max(0, d.bal), 0);
+  return `<div class="top-pills"><div class="card hero nw"><span class="k">Valeur nette</span><span class="v num">${money0(assets - debt)}</span><span class="note">${money0(assets)} d'avoirs · ${money0(debt)} de dettes</span></div>
+    ${s.accounts.length ? `<button class="fs-pill" data-act="tab" data-tab="future"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg><b>Foresight ›</b><span>dans 12 mois</span></button>` : ''}</div>`;
+}
+// Accounts as a pastel card: total, then each account with the days of everyday spending it covers
+// (bar toward the safety cushion set in Réglages › Profil, otherwise its share of the total).
+function accountsCard() {
+  const s = S.settings; if (!s.accounts.length) return '';
+  const assets = s.accounts.reduce((a, x) => a + Math.max(0, x.bal), 0), perDay = dailyCost(), tgtDays = (s.cushionMonths || 0) * 30.44;
+  const upd = s.accounts.map(x => (x.updated || '').slice(0, 10)).filter(Boolean).sort().pop();
   const pa = s.profile && s.accounts.find(a => a.id === s.profile.payAcc) || s.accounts.find(a => a.kind === 'cheque') || s.accounts[0];
-  // Envelopes = already filled (past periods); the current period's reserve shows apart until the period ends.
   const per = activePeriod(), held = s.wishes.reduce((a, w) => a + Math.min(w.saved || 0, w.price), 0), now = per ? reserveFor(per).wish : 0;
-  return `<div class="card k-acc" data-act="open-set" data-s="profil" role="button" aria-label="Mes comptes : ouvrir les réglages du profil"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Mes comptes</h2><button class="link" data-act="pf-open" data-step="2">Mettre à jour</button></div>
-    ${s.accounts.map(a => a === pa && (held > 0 || now > 0) ? `<div class="dline acc-card"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span>
-      <span class="d">${held > 0 ? `dont ${money0(held)} attribués à tes souhaits` : ''}${now > 0 ? `<span class="resv">${money0(now)} réservés pour tes souhaits cette période</span>` : ''}</span></div>`
-      : `<div class="dline"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span></div>`).join('')}
-    ${cards.map(d => { const n = since(d); return `<div class="dline acc-card"><span>${esc(d.name)}${d.id === src ? ' <span class="tag">dépenses</span>' : ''}</span><span class="num">−${money0(d.bal)}</span>
-      ${n ? `<span class="d">dont ${money0(n)} de dépenses saisies depuis le ${esc(shortDate((d.updated || '').slice(0, 10) || todayISO()))}</span>` : ''}
-      <button class="btn ghost sm" data-act="card-pay" data-id="${esc(d.id)}">Payer</button></div>`; }).join('')}
-    <div class="dline" style="font-weight:800"><span>Valeur nette</span><span class="num">${money0(assets - debt)}</span></div>
-    ${upd ? `<div class="note">Soldes confirmés le ${esc(shortDate(upd, true))}${src ? ', plus tes dépenses depuis' : ''}.</div>` : ''}
-    ${s.accounts.length ? `<button class="btn ghost block fs-btn" data-act="tab" data-tab="future"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Foresight</button>` : ''}</div>`;
+  const tot = perDay > 0 ? assets / perDay : null;
+  const head = tgtDays && tot != null ? Math.min(100, Math.round(tot / tgtDays * 100)) : null;
+  const rows = s.accounts.map(a => {
+    const d = perDay > 0 ? Math.max(0, a.bal) / perDay : null;
+    const pct = tgtDays && d != null ? Math.min(100, Math.round(d / tgtDays * 100)) : assets ? Math.round(Math.max(0, a.bal) / assets * 100) : 0;
+    const what = d != null ? `couvre ${daysLabel(d)} de dépenses` : `${pct} % de tes avoirs`;
+    const extra = a === pa ? [held > 0 ? `dont ${money0(held)} pour tes souhaits` : '', now > 0 ? `${money0(now)} réservés cette période` : ''].filter(Boolean).join(' · ') : '';
+    return `<span class="dline"><span>${esc(a.name)}</span><span class="num">${money0(a.bal)}</span><span class="d">${what}${tgtDays && d != null ? ` · ${pct} % de ${s.cushionMonths} mois` : ''}${extra ? ' · ' + esc(extra) : ''}</span><span class="meter" aria-hidden="true"><i style="width:${Math.max(3, pct)}%"></i></span></span>`;
+  }).join('');
+  return `<ul class="list stack"><li class="k-acc"><button class="debt" data-act="open-set" data-s="profil" aria-label="Mes comptes : ouvrir les réglages du profil">
+    <span class="l1"><span class="name">Mes comptes</span><span class="bal num">${money0(assets)}</span></span>
+    <span class="l2"><span>${tot != null ? `Couvre ${daysLabel(tot)} de dépenses` + (tgtDays ? ` · objectif ${s.cushionMonths} mois` : '') : `${s.accounts.length} compte${s.accounts.length > 1 ? 's' : ''}`}${upd ? ` · confirmés le ${esc(shortDate(upd))}` : ''}</span></span>
+    ${head != null ? `<span class="meter" aria-hidden="true"><i style="width:${Math.max(3, head)}%"></i></span>` : ''}
+    ${rows}</button></li></ul>`;
 }
 // Pay a card from an account: the card goes down, the account goes down, the payment counts as repaid.
 function sheetCardPay(id) {
@@ -2546,7 +2575,12 @@ function renderSettings() {
     </div>`,
   };
   const la = autoLeftover(), lm = la && la.monthly > 0 ? la.monthly : 0, hasDebt = s.debts.some(d => d.bal > 0);
-  sec.profil += `<div class="card"><h2>Ce qui reste sous ton seuil</h2>
+  const pd = dailyCost();
+  sec.profil += `<div class="card"><h2>Coussin de sécurité</h2>
+      <div class="note">Combien de mois de dépenses (courantes et fixes) tu veux garder dans tes comptes en cas de pépin. On conseille souvent 3 à 6 mois.</div>
+      <div class="seg five" role="group" aria-label="Coussin de sécurité">${[[0, 'Aucun'], [1, '1 mois'], [3, '3 mois'], [6, '6 mois'], [12, '12 mois']].map(([v, l]) => `<button data-act="cushion" data-v="${v}" aria-pressed="${(s.cushionMonths || 0) === v}">${l}</button>`).join('')}</div>
+      <div class="note">${pd > 0 ? `Tes dépenses courantes et fixes ≈ ${money0(pd * 30.44)}/mois${s.cushionMonths ? ` : objectif ≈ ${money0(pd * 30.44 * s.cushionMonths)}.` : '.'} Chaque compte du tableau de bord montre combien de jours il couvre.` : 'Le calcul commencera avec tes premières dépenses.'}</div></div>`
+    + `<div class="card"><h2>Ce qui reste sous ton seuil</h2>
       <div class="note">À la fin de chaque période, la part de ton reste qui va aux dettes. Le reste remplit tes souhaits sans date.</div>
       <div class="seg five" role="group" aria-label="Part du reste aux dettes">${[0, 25, 50, 75, 100].map(v => `<button data-act="leftover-pct" data-v="${v}" aria-pressed="${s.leftoverPct === v}">${v} %</button>`).join('')}</div>
       <div class="note">${!hasDebt ? 'Aucune dette en cours : tout ton reste va à tes souhaits.' : lm ? `Ton reste moyen ≈ ${money0(lm)}/mois : ≈ ${money0(lm * debtShare())} aux dettes, ≈ ${money0(lm * (1 - debtShare()))} aux souhaits sans date.` : 'Le partage s\'appliquera dès ta première période terminée sous le seuil.'}${hasDebt && s.leftoverPct ? ' Les dettes coûtent souvent plus en intérêts que ce que l\'épargne rapporte.' : ''}</div></div>`
@@ -2560,7 +2594,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.32.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.33.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -2786,6 +2820,7 @@ function sheetDebt(id) {
       <button class="btn ghost block" type="submit">Déduire du solde</button></form>
       ${pays.length ? `<ul class="list" style="box-shadow:none">${pays.map(p => `<li><div class="row"><span class="main"><span class="t">${esc(new Date(p.date + 'T12:00').toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' }))}</span></span><span class="amt num">${money(p.amt)}</span></div></li>`).join('')}</ul>` : ''}
     </div>
+    ${d.bal > 0 && S.settings.accounts.length ? `<button class="btn ghost block" type="button" data-act="card-pay" data-id="${esc(d.id)}">Payer depuis un compte</button>` : ''}
     <button class="btn danger block" id="dDel" type="button">Supprimer la dette</button>` : ''}`);
   $('#dForm').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -3159,6 +3194,7 @@ document.addEventListener('click', (e) => {
     case 'card-pay': sheetCardPay(t.dataset.id); break;
     case 'set-sec': UI.setSec = t.dataset.s; renderSettings(); window.scrollTo(0, 0); break;
     case 'open-set': UI.setSec = t.dataset.s; showTab('settings'); break;
+    case 'cushion': S.settings.cushionMonths = +t.dataset.v; persist('settings'); buzz('tile'); renderSettings(); break;
     case 'leftover-pct': S.settings.leftoverPct = +t.dataset.v; persist('settings'); buzz('tile'); renderSettings(); break;
     case 'goal-new': sheetGoal(null); break;
     case 'debt-use-need': S.settings.debtBudget = +t.dataset.v; persist('settings'); toast('Budget de remboursement mis à jour'); rerender(); break;
