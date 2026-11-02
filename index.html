@@ -2725,7 +2725,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.36.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.37.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -3576,10 +3576,20 @@ function detAdd(id, fx) {
   buzz('hit'); toast(item.fixed ? `${money(d.cents)} · ${fixedById(fx).name} : hors seuil` : `${money(d.cents)} · ${catById(cat).name} ajoutée`);
   detDone([id]); if (UI.tab === 'home') renderHome(); else rerender();
 }
+// v1.37: a tap on the « Dépense détectée » notification opens Saisie with the detected list.
+async function openFromNotif(o) {
+  if (!o || o.open !== 'detected') return;
+  await loadDetected();
+  if (UI.tab !== 'home') showTab('home');
+  if (nativeOn()) endNative(false);
+  if ((UI.detected || []).length) sheetDetected(); else closeSheet();
+}
+async function takeOpen() { if (!NP.PayNotif.takeOpen) return; try { await openFromNotif(await NP.PayNotif.takeOpen()); } catch (e) { } }
 if (NATIVE && NP.PayNotif) {
   NP.PayNotif.addListener('detected', () => loadDetected());
-  NP.App.addListener('resume', () => { loadDetected(); if (UI.tab === 'settings') payStatus().then(renderSettings); });
-  setTimeout(loadDetected, 400);
+  NP.PayNotif.addListener('open', () => takeOpen());
+  NP.App.addListener('resume', () => { loadDetected(); takeOpen(); if (UI.tab === 'settings') payStatus().then(renderSettings); });
+  setTimeout(() => { loadDetected(); takeOpen(); }, 400);
 }
 async function payStatus() {
   if (!NATIVE || !NP.PayNotif) return null;

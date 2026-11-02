@@ -30,8 +30,41 @@ import java.util.Set;
 public class PayNotifPlugin extends Plugin {
     private static WeakReference<PayNotifPlugin> live = new WeakReference<>(null);
 
+    /** Extra put on the « Dépense détectée » notification: the app opens on Saisie with the detected list. */
+    static final String OPEN_EXTRA = "expy_open";
+    private static String pendingOpen = null;
+
     @Override
-    public void load() { live = new WeakReference<>(this); }
+    public void load() {
+        live = new WeakReference<>(this);
+        if (getActivity() != null) takeIntent(getActivity().getIntent());
+    }
+
+    @Override
+    protected void handleOnNewIntent(Intent intent) {
+        super.handleOnNewIntent(intent);
+        if (takeIntent(intent)) {
+            JSObject o = new JSObject();
+            o.put("open", pendingOpen);
+            notifyListeners("open", o);
+        }
+    }
+
+    private static boolean takeIntent(Intent intent) {
+        if (intent == null || !intent.hasExtra(OPEN_EXTRA)) return false;
+        pendingOpen = intent.getStringExtra(OPEN_EXTRA);
+        intent.removeExtra(OPEN_EXTRA);
+        return pendingOpen != null;
+    }
+
+    /** What the last notification tap asked for (once), or nothing. */
+    @PluginMethod
+    public void takeOpen(PluginCall call) {
+        JSObject o = new JSObject();
+        if (pendingOpen != null) o.put("open", pendingOpen);
+        pendingOpen = null;
+        call.resolve(o);
+    }
 
     /** Called by the listener: lets the open app refresh its list right away. */
     static void emit(Context c) {

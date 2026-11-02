@@ -81,6 +81,7 @@ public class PayListener extends NotificationListenerService {
         String title = "Dépense détectée : " + amount + (r.merchant != null ? " · " + r.merchant : "");
         String body = count > 1 ? count + " dépenses à confirmer dans Expy." : "Touche pour l'ajouter dans Expy (" + app + ").";
         Intent open = new Intent(c, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        open.putExtra(PayNotifPlugin.OPEN_EXTRA, "detected");
         PendingIntent pi = PendingIntent.getActivity(c, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder b = new NotificationCompat.Builder(c, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_coin)
