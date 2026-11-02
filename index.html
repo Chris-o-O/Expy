@@ -207,6 +207,9 @@ body.nofx .fab, body.nofx .keypad .add, body.nofx .tile { transition: none; }
 .hbar.live i, .hbar.live b { transition: none; }
 .det { display: flex; flex-direction: column; gap: 6px; padding: 14px; }
 .det-top { display: flex; justify-content: space-between; align-items: baseline; }
+.det-opts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.det-split { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; } .det-split .sp-line { flex-wrap: wrap; }
+.det-more { margin-top: 8px; }
 .det-amt { font-size: 24px; font-weight: 800; } .det-when { font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .det-who { font-weight: 800; } .det-raw { font-size: 12px; color: var(--muted); }
 .det-fixed { margin-top: 8px; padding: 7px 12px; border-radius: 12px; background: var(--p6); color: #0A0A0A; font-size: 13px; font-weight: 700; }
@@ -2725,7 +2728,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.37.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.38.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -2748,6 +2751,7 @@ function sheetPerson() {
     if (!name) { $('#peErr').textContent = 'Indique un prénom.'; $('#peErr').hidden = false; return; }
     const p = { id: 'u' + uid(), name, since: '' };
     S.settings.people.push(p);
+    if (UI.detPersonFor) { const o = detOpt(UI.detPersonFor); o.pid = p.id; o.split = true; UI.detPersonFor = null; persist('settings'); sheetDetected(); return; }
     UI.split.pid = p.id; UI.split.on = true;
     persist('settings'); closeSheet(); rerender();
   });
@@ -3309,7 +3313,7 @@ document.addEventListener('click', (e) => {
     case 'split-person': UI.split.pid = t.dataset.id; renderSplit(); break;
     case 'split-by': UI.split.by = t.dataset.v; renderSplit(); break;
     case 'split-pct': UI.split.pct = Number(t.dataset.v); renderSplit(); break;
-    case 'person-new': sheetPerson(); break;
+    case 'person-new': UI.detPersonFor = null; sheetPerson(); break;
     case 'share-open': sheetShare(t.dataset.id); break;
     case 'goals': showTab('goals'); break;
     case 'pace-info': if (!nativeOn() && !amtCents()) window.showPace(t); break;
@@ -3329,7 +3333,11 @@ document.addEventListener('click', (e) => {
     }
     case 'fut-mode': UI.futMode = t.dataset.m; renderFuture(); break;
     case 'det-open': loadDetected().then(sheetDetected); break;
-    case 'det-cat': UI.detCat[t.dataset.id] = t.dataset.cat; for (const b of t.parentElement.children) b.setAttribute('aria-pressed', String(b === t)); break;
+    case 'det-cat': { UI.detCat[t.dataset.id] = t.dataset.cat; for (const b of t.parentElement.children) b.setAttribute('aria-pressed', String(b === t));
+      const o = detOpt(t.dataset.id); if (!o.homePicked) { o.home = !!catById(t.dataset.cat).home; const hb = t.closest('.det').querySelector('[data-o="home"]'); if (hb) hb.setAttribute('aria-pressed', String(o.home)); } break; }
+    case 'det-opt': { const o = detOpt(t.dataset.id), k = t.dataset.o; o[k] = !o[k]; if (k === 'home') o.homePicked = true; buzz('tile'); detRefresh(t); break; }
+    case 'det-sp': { const o = detOpt(t.dataset.id), k = t.dataset.o; o[k] = k === 'pct' ? +t.dataset.v : t.dataset.v; buzz('tile'); detRefresh(t); break; }
+    case 'det-person-new': UI.detPersonFor = t.dataset.id; sheetPerson(); break;
     case 'det-add': detAdd(t.dataset.id, t.dataset.fixed); break;
     case 'fixed-yes': case 'fixed-no': { const f = a === 'fixed-yes' && fixedById(UI.fixedAsk); closeSheet(); addExpense(f ? f.id : null); break; }
     case 'det-skip': detDone([t.dataset.id]); break;
@@ -3551,12 +3559,44 @@ function sheetDetected() {
       <div class="det-who">${esc(d.merchant || d.title || 'Commerçant inconnu')} <span class="muted">· ${esc(d.app || '')}</span></div>
       <div class="det-raw">${esc(((d.title ? d.title + ' — ' : '') + (d.text || '')).slice(0, 140))}</div>
       <div class="chips det-cats">${S.settings.cats.map(c => `<button type="button" class="chip" data-act="det-cat" data-id="${esc(d.id)}" data-cat="${esc(c.id)}" aria-pressed="${UI.detCat[d.id] === c.id}"><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.name)}</button>`).join('')}</div>
+      ${detOptsHTML(d)}
       ${fm ? `<div class="det-fixed">Déjà dans tes charges fixes : ${esc(fm.name)} (${money0(fm.amt)}/mois)</div>
       <div class="btn-row"><button class="btn" data-act="det-add" data-id="${esc(d.id)}" data-fixed="${esc(fm.id)}">Hors seuil</button><button class="btn ghost" data-act="det-add" data-id="${esc(d.id)}">Compter</button><button class="btn ghost" data-act="det-skip" data-id="${esc(d.id)}">Ignorer</button></div>`
       : `<div class="btn-row"><button class="btn" data-act="det-add" data-id="${esc(d.id)}">Ajouter</button><button class="btn ghost" data-act="det-skip" data-id="${esc(d.id)}">Ignorer</button></div>`}
     </div>`; }).join('')}
     ${list.length > 1 ? '<button class="btn ghost block" data-act="det-skip-all">Tout ignorer</button>' : ''}`);
 }
+/* v1.38: the same options as the classic entry (home, shared, note, date), per detected expense. */
+function detOpt(id) {
+  UI.detOpts = UI.detOpts || {};
+  if (!UI.detOpts[id]) {
+    const d = (UI.detected || []).find(x => x.id === id), ls = S.settings.lastSplit, dt = d ? new Date(d.ts) : new Date();
+    UI.detOpts[id] = { home: d ? !!catById(UI.detCat[id] || detGuessCat(d)).home : false, homePicked: false, split: false, pid: ls ? ls.pid : null, pct: ls ? ls.pct : 50, by: ls ? ls.by : 'me',
+      more: false, note: d ? (d.merchant || '') : '', date: isoOf(dt) };
+  }
+  return UI.detOpts[id];
+}
+function detOptsHTML(d) {
+  const o = detOpt(d.id), s = S.settings, id = esc(d.id);
+  if (!s.people.some(p => p.id === o.pid)) o.pid = s.people[0] ? s.people[0].id : null;
+  const who = s.people.find(p => p.id === o.pid);
+  let h = `<div class="det-opts"><button type="button" class="toggle sm" data-act="det-opt" data-id="${id}" data-o="home" aria-pressed="${o.home}"><span class="sw"></span>Faisable à la maison</button>
+    <button type="button" class="toggle sm" data-act="det-opt" data-id="${id}" data-o="split" aria-pressed="${o.split}"><span class="sw"></span>Partagé</button>
+    <button type="button" class="toggle sm" data-act="det-opt" data-id="${id}" data-o="more" aria-pressed="${o.more}"><span class="sw"></span>Note, date</button></div>`;
+  if (o.split) h += `<div class="det-split"><div class="sp-line"><span class="sp-k">Avec</span>${s.people.map(p => `<button type="button" class="chip sm" data-act="det-sp" data-id="${id}" data-o="pid" data-v="${esc(p.id)}" aria-pressed="${p.id === o.pid}">${esc(p.name)}</button>`).join('')}<button type="button" class="chip sm" data-act="det-person-new" data-id="${id}">+ Personne</button></div>`
+    + (who ? `<div class="sp-line"><span class="sp-k">Payé par</span><button type="button" class="chip sm" data-act="det-sp" data-id="${id}" data-o="by" data-v="me" aria-pressed="${o.by === 'me'}">Moi</button><button type="button" class="chip sm" data-act="det-sp" data-id="${id}" data-o="by" data-v="them" aria-pressed="${o.by === 'them'}">${esc(who.name)}</button></div>
+      <div class="sp-line"><span class="sp-k">Ma part</span>${[0, 25, 33, 50, 67, 75].map(v => `<button type="button" class="chip sm" data-act="det-sp" data-id="${id}" data-o="pct" data-v="${v}" aria-pressed="${o.pct === v}">${v} %</button>`).join('')}</div>
+      <div class="note">Ma part : ${money(Math.round(d.cents * o.pct / 100))} sur ${money(d.cents)}</div>` : '') + `</div>`;
+  if (o.more) h += `<div class="two det-more"><label>Note<input class="field" data-det-note="${id}" maxlength="80" value="${esc(o.note)}"></label><label>Date<input class="field" type="date" data-det-date="${id}" value="${esc(o.date)}" max="${todayISO()}"></label></div>`;
+  return h;
+}
+document.addEventListener('input', (e) => {
+  const n = e.target.dataset && (e.target.dataset.detNote || e.target.dataset.detDate);
+  if (!n) return;
+  const o = detOpt(n); if (e.target.dataset.detNote) o.note = e.target.value; else o.date = e.target.value;
+});
+// Re-render the sheet without losing its scroll position.
+function detRefresh(t) { const pnl = $('#sheetPanel'), y = pnl.scrollTop; sheetDetected(); pnl.scrollTop = y; }
 async function detDone(ids) {
   UI.detected = (UI.detected || []).filter(d => !ids.includes(d.id));
   try { await NP.PayNotif.dismiss({ ids }); } catch (e) { }
@@ -3564,16 +3604,21 @@ async function detDone(ids) {
 }
 function detAdd(id, fx) {
   const d = (UI.detected || []).find(x => x.id === id); if (!d) return;
-  const cat = UI.detCat[id] || detGuessCat(d), ts = new Date(d.ts).toISOString();
-  const item = { id: uid(), amt: d.cents, cat, ts, home: !!catById(cat).home, note: d.merchant || '', src: 'notif' };
-  if (fx && fixedById(fx)) item.fixed = fx;
+  const cat = UI.detCat[id] || detGuessCat(d), o = detOpt(id);
+  let ts = new Date(d.ts).toISOString();
+  if (o.date && o.date !== isoOf(new Date(d.ts))) { const [y, m, dd] = o.date.split('-').map(Number); if (y && m && dd) ts = new Date(y, m - 1, dd, 12, 0).toISOString(); }
+  const shared = o.split && S.settings.people.some(p => p.id === o.pid);
+  const item = { id: uid(), amt: shared ? Math.round(d.cents * o.pct / 100) : d.cents, cat, ts, home: o.homePicked ? !!o.home : !!catById(cat).home, note: o.note.trim(), src: 'notif' };
+  if (shared) { item.split = { pid: o.pid, total: d.cents, pct: o.pct, by: o.by }; S.settings.lastSplit = { pid: o.pid, pct: o.pct, by: o.by }; }
+  else if (fx && fixedById(fx)) item.fixed = fx;
   tagSource(item);
   const mk = monthKey(new Date(ts));
   (S.months[mk] = S.months[mk] || []).push(item);
   charge(item, 1);
   const k = merchantKey(d.merchant); if (k) S.settings.merchantCats[k] = cat;
   persist(mKey(mk)); persist('settings');
-  buzz('hit'); toast(item.fixed ? `${money(d.cents)} · ${fixedById(fx).name} : hors seuil` : `${money(d.cents)} · ${catById(cat).name} ajoutée`);
+  buzz('hit'); toast(item.fixed ? `${money(d.cents)} · ${fixedById(fx).name} : hors seuil` : shared ? `${money(d.cents)} · ${catById(cat).name} · ma part ${money(item.amt)}` : `${money(d.cents)} · ${catById(cat).name} ajoutée`);
+  if (UI.detOpts) delete UI.detOpts[id];
   detDone([id]); if (UI.tab === 'home') renderHome(); else rerender();
 }
 // v1.37: a tap on the « Dépense détectée » notification opens Saisie with the detected list.
