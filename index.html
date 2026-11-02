@@ -209,6 +209,7 @@ body.nofx .fab, body.nofx .keypad .add, body.nofx .tile { transition: none; }
 .det-top { display: flex; justify-content: space-between; align-items: baseline; }
 .det-amt { font-size: 24px; font-weight: 800; } .det-when { font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .det-who { font-weight: 800; } .det-raw { font-size: 12px; color: var(--muted); }
+.det-fixed { margin-top: 8px; padding: 7px 12px; border-radius: 12px; background: var(--p6); color: #0A0A0A; font-size: 13px; font-weight: 700; }
 .det-cats { flex-wrap: wrap; overflow: visible; margin-inline: 0; padding-inline: 0; }
 .pay-step { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; font-weight: 700; font-size: 14px; }
 .pay-n { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface-2); font-weight: 800; font-size: 13px; }
@@ -825,7 +826,7 @@ function cleanMonths(m) {
   for (const [k, list] of Object.entries(m)) {
     if (!/^\d{4}-\d{2}$/.test(k) || !Array.isArray(list)) continue;
     out[k] = list.filter(i => i && typeof i === 'object' && Number.isFinite(+i.amt) && typeof i.ts === 'string' && !isNaN(new Date(i.ts)))
-      .map(i => Object.assign({}, i, { id: String(i.id ?? uid()), amt: +i.amt, cat: String(i.cat ?? 'autre'), note: typeof i.note === 'string' ? i.note : '' }));
+      .map(i => Object.assign({}, i, { id: String(i.id ?? uid()), amt: +i.amt, cat: String(i.cat ?? 'autre'), note: typeof i.note === 'string' ? i.note : '', fixed: typeof i.fixed === 'string' && i.fixed ? i.fixed.slice(0, 40) : undefined }));
   }
   return out;
 }
@@ -977,7 +978,33 @@ function trackingStart() {
 const itemsOf = (mk) => S.months[mk] || [];
 const sumC = (arr) => arr.reduce((s, i) => s + i.amt, 0);
 // Against the threshold: a wish bought with its envelope only counts for what the envelope did not cover.
-const spentC = (arr) => arr.reduce((s, i) => s + i.amt - Math.min(i.env || 0, i.amt), 0);
+const spentC = (arr) => arr.reduce((s, i) => s + (i.fixed ? 0 : i.amt - Math.min(i.env || 0, i.amt)), 0);
+/* Fixed charges of the profile (v1.34): they already come off the pay before the threshold, so an expense that
+   looks like one (name in the note / merchant, or the same monthly amount) asks before it counts a second time.
+   it.fixed = id of the charge: kept in stats and on the card / account, left out of everything compared to the threshold. */
+const fold = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const FIXED_HINTS = [
+  [/^(metro|transport|bus|passe|opus)/, ['stm', 'opus', 'exo', 'rtl', 'stl', 'transport en commun']],
+  [/^(internet|wifi)/, ['videotron', 'bell', 'fizz', 'internet', 'ebox', 'cogeco']],
+  [/^(cell|telephone|mobile|forfait)/, ['fido', 'koodo', 'virgin', 'rogers', 'telus', 'bell', 'fizz', 'public mobile', 'videotron']],
+  [/^(assurance)/, ['assurance', 'desjardins', 'intact', 'belairdirect', 'sonnet']],
+  [/^(abonnement|streaming|netflix|spotify|musique|tele)/, ['netflix', 'spotify', 'disney', 'crave', 'apple', 'youtube', 'prime video']],
+  [/^(gym|sport|salle)/, ['gym', 'energie cardio', 'econofitness', 'nautilus']],
+  [/^(hydro|electricite)/, ['hydro-quebec', 'hydro quebec']],
+];
+function fixedMatch(text, amt) {
+  const pf = S.settings.profile; if (!pf || !Array.isArray(pf.fixedItems) || !pf.fixedItems.length) return null;
+  const raw = String(text || '').toLowerCase(), n = fold(text);
+  const has = (hay, k) => new RegExp('(^|[^\\p{L}\\p{N}])' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u').test(hay);
+  if (n) for (const f of pf.fixedItems) {
+    const words = String(f.name).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 3);
+    // the name itself, accents kept (« métro » the subway, not Metro the grocery store), then known merchants
+    if (words.some(w => has(raw, w))) return f;
+    for (const w of words) for (const [re, keys] of FIXED_HINTS) if (re.test(fold(w)) && keys.some(k => has(n, k))) return f;
+  }
+  if (amt >= 1500) return pf.fixedItems.find(f => Math.abs(f.amt - amt) <= 100) || null;
+  return null;
+}
 function allItems() { return Object.values(S.months).flat(); }
 function catOrder() {
   const since = Date.now() - 90 * 864e5;
@@ -1235,7 +1262,7 @@ function pressAdd(btn) {
   UI.adding = true; btn.classList.add('done');
   setTimeout(() => { btn.classList.remove('done'); UI.adding = false; if (UI.income) addIncome(); else addExpense(); }, 240);
 }
-function addExpense() {
+function addExpense(fx) {
   const total = amtCents();
   if (total <= 0) return;
   const sp = UI.split, shared = sp.on && S.settings.people.some(p => p.id === sp.pid);
@@ -1246,6 +1273,8 @@ function addExpense() {
   else { const [y, m, d] = dateStr.split('-').map(Number); ts = new Date(y, m - 1, d, 12, 0).toISOString(); }
   const mk = monthKey(new Date(ts));
   const item = { id: uid(), amt, cat: UI.cat, ts, home: !!UI.home, note: $('#noteIn').value.trim() };
+  if (!shared && fx === undefined) { const fm = fixedMatch(item.note || catById(item.cat).name, amt); if (fm) return sheetFixedAsk(fm); }
+  if (fx) item.fixed = fx;
   if (shared) { item.split = { pid: sp.pid, total, pct: sp.pct, by: sp.by }; S.settings.lastSplit = { pid: sp.pid, pct: sp.pct, by: sp.by }; persist('settings'); }
   const per = periodFor(dayOfItem(item));
   const isActive = per && per === activePeriod();
@@ -1255,7 +1284,7 @@ function addExpense() {
   charge(item, 1);
   persist(mKey(mk));
   const th = per ? per.amount : null;
-  const after = before + amt;
+  const after = before + (item.fixed ? 0 : amt);
   const cat = catById(item.cat);
   let msg = shared ? `${money(total)} · ${cat.name} · ma part ${money(amt)}` : `${money(amt)} · ${cat.name}`;
   if (cat.limit) { const cs = sumC(itemsOf(mk).filter(i => i.cat === cat.id)); msg += ` (seuil de la catégorie : ${money0(cs)} sur ${money0(cat.limit)} ce mois-ci)`; }
@@ -1269,13 +1298,25 @@ function addExpense() {
   const tileIco = document.querySelector(`.tile[data-cat="${CSS.escape(item.cat)}"] .ico`), tr = tileIco && tileIco.getBoundingClientRect();
   const from = tr && tr.width ? { x: tr.left + tr.width / 2, y: tr.top + tr.height / 2 } : null;
   const prev = isActive && UI.hs && UI.hs.per ? { spent: UI.hs.spent, left: UI.hs.left } : null;
+  if (item.fixed) { const f = fixedById(item.fixed), src = item.via && srcById(item.via); msg = `${money(amt)} · ${f ? f.name : 'charge fixe'} : hors seuil${src ? ', portée sur ' + src.name : ''}`; }
   resetEntry(nativeOn());
   renderHome();
-  celebrateAdd(cat, from, prev);
+  if (item.fixed) buzz('hit'); else celebrateAdd(cat, from, prev);
   toast(msg, () => {
     S.months[mk] = itemsOf(mk).filter(i => i.id !== item.id); charge(item, -1);
     persist(mKey(mk)); renderHome();
   }, kind);
+}
+
+const fixedById = (id) => ((S.settings.profile && S.settings.profile.fixedItems) || []).find(f => f.id === id) || null;
+function sheetFixedAsk(f) {
+  const id = spendSource(), src = id && srcById(id);
+  UI.fixedAsk = f.id;
+  openSheet(`<h1>Déjà dans tes charges fixes ?</h1>
+    <div class="note">Ça ressemble à « ${esc(f.name)} » (${money0(f.amt)}/mois). Cette charge sort déjà de ta paie avant ton seuil : la compter ici la retirerait deux fois.</div>
+    <button class="btn block" data-act="fixed-yes">C'est ma charge « ${esc(f.name)} »</button>
+    <div class="note" style="margin-top:6px">${src ? `Hors seuil, mais portée sur ${esc(src.name)} pour garder son solde juste.` : 'Hors seuil. Elle reste visible dans Stats.'}</div>
+    <button class="btn ghost block" data-act="fixed-no">Non, c'est une dépense</button>`);
 }
 
 /* ---------- Card / account ledger (v1.20) ----------
@@ -1575,7 +1616,7 @@ function rowHTML(it) {
   return `<li><button class="row" data-act="edit-item" data-id="${esc(it.id)}">
     <span class="dot" style="background:${esc(c.color)}"></span>
     <span class="main"><span class="t">${esc(c.name)}${it.note ? ' · <span class="muted" style="font-weight:500">' + esc(it.note) + '</span>' : ''}</span><span class="d">${esc(dateLabel(it.ts))}${it.split ? ' · sur ' + money0(it.split.total) : ''}</span></span>
-    ${it.split ? `<span class="tag share">${esc(personName(it.split.pid))}</span>` : ''}${it.home ? '<span class="tag home">maison</span>' : ''}${it.ex ? '<span class="tag ex">ex.</span>' : ''}
+    ${it.split ? `<span class="tag share">${esc(personName(it.split.pid))}</span>` : ''}${it.home ? '<span class="tag home">maison</span>' : ''}${it.ex ? '<span class="tag ex">ex.</span>' : ''}${it.fixed ? '<span class="tag ex">fixe</span>' : ''}
     <span class="amt num">${money(it.amt)}</span></button></li>`;
 }
 function renderHome() { renderSummary(); renderBanners(); renderChips(); renderSplit(); }
@@ -2594,7 +2635,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.33.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.34.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -2760,13 +2801,15 @@ function sheetItem(id) {
   const { it } = f;
   const d = new Date(it.ts);
   const dIso = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-  const state = { cat: it.cat, home: it.home, by: it.split ? it.split.by : null };
+  const state = { cat: it.cat, home: it.home, by: it.split ? it.split.by : null, fixed: it.fixed || null };
+  const fxList = (S.settings.profile && S.settings.profile.fixedItems) || [];
   openSheet(`<h1>Modifier la dépense</h1>
     <form class="form" id="itForm">
       <div class="two"><label>Montant ${it.split ? 'total ' : ''}($)<input class="field num" id="itAmt" inputmode="decimal" value="${esc(toInputMoney(it.split ? it.split.total : it.amt))}"></label>
       <label>Date<input class="field" id="itDate" type="date" value="${dIso}"></label></div>
       <div class="chips" id="itCats">${S.settings.cats.map(c => `<button type="button" class="chip" data-cat="${esc(c.id)}" aria-pressed="${c.id === it.cat}"><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.name)}</button>`).join('')}</div>
       <button type="button" class="toggle" id="itHome" aria-pressed="${!!it.home}"><span class="sw"></span>Faisable à la maison</button>
+      ${!it.split && (it.fixed || fxList.length) ? `<button type="button" class="toggle" id="itFixed" aria-pressed="${!!it.fixed}"><span class="sw"></span>Charge fixe du profil (hors seuil)</button>` : ''}
       ${it.split ? `<div class="two"><label>Ma part (%)<input class="field num" id="itPct" inputmode="decimal" value="${esc(String(it.split.pct).replace('.', ','))}"></label>
         <div class="form"><label>Payé par</label><div class="sp-line"><button type="button" class="chip sm" data-by="me" aria-pressed="${it.split.by === 'me'}">Moi</button><button type="button" class="chip sm" data-by="them" aria-pressed="${it.split.by === 'them'}">${esc(personName(it.split.pid))}</button></div></div></div>` : ''}
       <label>Note<input class="field" id="itNote" maxlength="80" value="${esc(it.note || '')}"></label>
@@ -2776,6 +2819,10 @@ function sheetItem(id) {
   $('#itCats').addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; state.cat = b.dataset.cat; for (const x of $('#itCats').children) x.setAttribute('aria-pressed', String(x.dataset.cat === state.cat)); });
   if (it.split) $('#itForm').addEventListener('click', (e) => { const b = e.target.closest('[data-by]'); if (!b) return; state.by = b.dataset.by; for (const x of $('#itForm').querySelectorAll('[data-by]')) x.setAttribute('aria-pressed', String(x.dataset.by === state.by)); });
   $('#itHome').addEventListener('click', () => { state.home = !state.home; $('#itHome').setAttribute('aria-pressed', String(state.home)); });
+  if ($('#itFixed')) $('#itFixed').addEventListener('click', () => {
+    state.fixed = state.fixed ? null : (it.fixed || (fixedMatch(it.note || catById(state.cat).name, it.amt) || fxList[0] || { id: 'fixe' }).id);
+    $('#itFixed').setAttribute('aria-pressed', String(!!state.fixed));
+  });
   $('#itDel').addEventListener('click', () => {
     if (UI.confirm !== 'del') { UI.confirm = 'del'; $('#itDel').textContent = 'Confirmer la suppression'; return; }
     const g = findItem(id); if (!g) return closeSheet();
@@ -2791,6 +2838,7 @@ function sheetItem(id) {
     let ts = g.it.ts;
     if (ds && ds !== dIso) { const [y, m, dd] = ds.split('-').map(Number); ts = new Date(y, m - 1, dd, 12, 0).toISOString(); }
     const upd = Object.assign({}, g.it, { amt, cat: state.cat, home: state.home, note: $('#itNote').value.trim(), ts });
+    if (state.fixed) upd.fixed = state.fixed; else delete upd.fixed;
     if (g.it.split) {
       const pv = parseFloat(String($('#itPct').value).replace(',', '.')), pc = isNaN(pv) ? g.it.split.pct : Math.max(0, Math.min(100, pv));
       upd.split = Object.assign({}, g.it.split, { total: amt, pct: pc, by: state.by }); upd.amt = Math.round(amt * pc / 100);
@@ -2868,7 +2916,7 @@ function sheetReview(pid) {
   const sa = pf && pa && (s.accounts.find(a => a.id === pf.saveAcc && a.id !== pa.id) || (pf.saveAcc === undefined ? s.accounts.find(a => a.kind === 'epargne' && a.id !== pa.id) : null));
   const dep = pa && !p.deposited ? { pa, sa, on: !pa.updated || pa.updated.slice(0, 10) < p.start } : null;
   // The period in short: how many expenses, average, main category, biggest one, share doable at home, vs the period before.
-  const its = itemsIn(p), n = its.length, tot = sumC(its);
+  const its = itemsIn(p).filter(i => !i.fixed), n = its.length, tot = sumC(its);
   let recap = '';
   if (n) {
     const byCat = {}; for (const i of its) byCat[i.cat] = (byCat[i.cat] || 0) + i.amt;
@@ -3183,7 +3231,8 @@ document.addEventListener('click', (e) => {
     case 'fut-mode': UI.futMode = t.dataset.m; renderFuture(); break;
     case 'det-open': loadDetected().then(sheetDetected); break;
     case 'det-cat': UI.detCat[t.dataset.id] = t.dataset.cat; for (const b of t.parentElement.children) b.setAttribute('aria-pressed', String(b === t)); break;
-    case 'det-add': detAdd(t.dataset.id); break;
+    case 'det-add': detAdd(t.dataset.id, t.dataset.fixed); break;
+    case 'fixed-yes': case 'fixed-no': { const f = a === 'fixed-yes' && fixedById(UI.fixedAsk); closeSheet(); addExpense(f ? f.id : null); break; }
     case 'det-skip': detDone([t.dataset.id]); break;
     case 'det-skip-all': detDone((UI.detected || []).map(d => d.id)); break;
     case 'pay-notify': NP.PayNotif.requestNotify().then(() => payStatus()).then(renderSettings); break;
@@ -3398,13 +3447,15 @@ function sheetDetected() {
   for (const d of list) if (!UI.detCat[d.id]) UI.detCat[d.id] = detGuessCat(d);
   openSheet(`<h1>Dépenses détectées</h1>
     <div class="note">Repérées dans tes notifications de paiement. Vérifie la catégorie, puis ajoute ou ignore.</div>
-    ${list.map(d => `<div class="card det">
+    ${list.map(d => { const fm = fixedMatch([d.merchant, d.title, d.text].filter(Boolean).join(' '), d.cents); return `<div class="card det">
       <div class="det-top"><span class="det-amt num">${money(d.cents)}</span><span class="det-when">${esc(dateLabel(new Date(d.ts).toISOString()))}</span></div>
       <div class="det-who">${esc(d.merchant || d.title || 'Commerçant inconnu')} <span class="muted">· ${esc(d.app || '')}</span></div>
       <div class="det-raw">${esc(((d.title ? d.title + ' — ' : '') + (d.text || '')).slice(0, 140))}</div>
       <div class="chips det-cats">${S.settings.cats.map(c => `<button type="button" class="chip" data-act="det-cat" data-id="${esc(d.id)}" data-cat="${esc(c.id)}" aria-pressed="${UI.detCat[d.id] === c.id}"><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.name)}</button>`).join('')}</div>
-      <div class="btn-row"><button class="btn" data-act="det-add" data-id="${esc(d.id)}">Ajouter</button><button class="btn ghost" data-act="det-skip" data-id="${esc(d.id)}">Ignorer</button></div>
-    </div>`).join('')}
+      ${fm ? `<div class="det-fixed">Déjà dans tes charges fixes : ${esc(fm.name)} (${money0(fm.amt)}/mois)</div>
+      <div class="btn-row"><button class="btn" data-act="det-add" data-id="${esc(d.id)}" data-fixed="${esc(fm.id)}">Hors seuil</button><button class="btn ghost" data-act="det-add" data-id="${esc(d.id)}">Compter</button><button class="btn ghost" data-act="det-skip" data-id="${esc(d.id)}">Ignorer</button></div>`
+      : `<div class="btn-row"><button class="btn" data-act="det-add" data-id="${esc(d.id)}">Ajouter</button><button class="btn ghost" data-act="det-skip" data-id="${esc(d.id)}">Ignorer</button></div>`}
+    </div>`; }).join('')}
     ${list.length > 1 ? '<button class="btn ghost block" data-act="det-skip-all">Tout ignorer</button>' : ''}`);
 }
 async function detDone(ids) {
@@ -3412,17 +3463,18 @@ async function detDone(ids) {
   try { await NP.PayNotif.dismiss({ ids }); } catch (e) { }
   renderBanners(); sheetDetected();
 }
-function detAdd(id) {
+function detAdd(id, fx) {
   const d = (UI.detected || []).find(x => x.id === id); if (!d) return;
   const cat = UI.detCat[id] || detGuessCat(d), ts = new Date(d.ts).toISOString();
   const item = { id: uid(), amt: d.cents, cat, ts, home: !!catById(cat).home, note: d.merchant || '', src: 'notif' };
+  if (fx && fixedById(fx)) item.fixed = fx;
   tagSource(item);
   const mk = monthKey(new Date(ts));
   (S.months[mk] = S.months[mk] || []).push(item);
   charge(item, 1);
   const k = merchantKey(d.merchant); if (k) S.settings.merchantCats[k] = cat;
   persist(mKey(mk)); persist('settings');
-  buzz('hit'); toast(`${money(d.cents)} · ${catById(cat).name} ajoutée`);
+  buzz('hit'); toast(item.fixed ? `${money(d.cents)} · ${fixedById(fx).name} : hors seuil` : `${money(d.cents)} · ${catById(cat).name} ajoutée`);
   detDone([id]); if (UI.tab === 'home') renderHome(); else rerender();
 }
 if (NATIVE && NP.PayNotif) {
@@ -3455,7 +3507,7 @@ if (!S.settings.profile && !S.settings.profileSkip && !allItems().length && !S.s
 window.addEventListener('hashchange', () => { if (HASH_TABS[location.hash]) showTab(HASH_TABS[location.hash]); });
 connect().then(() => { resetEntry(); rerender(); });
 
-window.__budget = { addIncome, removeIncome, projection, confidence, sheetReview, payPeriodAt, saveReco, renderDash, renderGoals, reserveFor, startNative, endNative, homeState, simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
+window.__budget = { addIncome, addExpense, fixedMatch, sheetDetected, removeIncome, projection, confidence, sheetReview, payPeriodAt, saveReco, renderDash, renderGoals, reserveFor, startNative, endNative, homeState, simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
 })();
 </script>
 </body>
