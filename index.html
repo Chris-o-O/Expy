@@ -412,10 +412,11 @@ body.appkeys #v-home:not(.typing) .opts-row, body.appkeys #v-home:not(.typing) .
 .month-nav .mn-t { display: flex; flex-direction: column; align-items: center; min-width: 0; text-align: center; }
 .month-nav .mn-t h1 { white-space: nowrap; font-size: clamp(20px, 6.4vw, 28px); }
 .month-nav .mn-t span { font-size: 12px; font-weight: 700; color: var(--muted); }
-.seg.st-mode { max-width: 240px; margin: 0 auto 10px; }
-.st-cats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 12px -16px 0; padding: 2px 16px 4px; }
-.st-cats::-webkit-scrollbar { display: none; }
-.st-cats .chip { flex: none; }
+.seg.st-mode { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; padding: 3px; margin: 0 0 12px; }
+.seg.st-mode button { padding: 8px 0; font-size: clamp(11px, 3.3vw, 13px); white-space: nowrap; letter-spacing: -.01em; }
+.month-nav.range { justify-content: center; min-height: 44px; }
+.st-cats { flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.st-cats .chip { padding: 6px 11px; font-size: 13px; }
 .st-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .st-head h2 { margin: 0; }
 .seg.st-unit { width: 96px; padding: 3px; flex: none; } .seg.st-unit button { padding: 5px; font-size: 13px; }
@@ -2236,8 +2237,26 @@ function previewBudget(v) {
 /* Stats (v1.35): a period (pay period, default) or a calendar month, chosen at the top with ‹ ›.
    Category chips: nothing checked = no curve; each checked category draws its curve over the total bars
    and filters the list. The « % » view shows each category's share of 100 % of the spending, bucket by bucket. */
+const ST_RANGES = [['period', 'Période'], ['month', 'Mois'], ['3', '3 mois'], ['6', '6 mois'], ['12', '12 mois'], ['all', 'Tout']];
+const monthTick = (k) => { const d = parseMonth(k), m = d.toLocaleDateString('fr-CA', { month: 'short' }).replace('.', ''); return k.endsWith('-01') ? m + ' ' + String(d.getFullYear()).slice(2) : m; };
 function statsBuckets() {
-  const s = S.settings, start = trackingStart(), today = todayISO();
+  const s = S.settings, start = trackingStart(), today = todayISO(), startMk = start.slice(0, 7);
+  if (!ST_RANGES.some(r => r[0] === UI.statsMode)) UI.statsMode = 'period';
+  if (['3', '6', '12', 'all'].includes(UI.statsMode)) {
+    // a range: the last N calendar months (current one included), never before the start of tracking
+    const n = UI.statsMode === 'all' ? 999 : +UI.statsMode, cm = curMonth();
+    let firstMk = UI.statsMode === 'all' ? startMk : addMonths(cm, -(n - 1)); if (firstMk < startMk) firstMk = startMk;
+    const from = firstMk + '-01' < start ? start : firstMk + '-01';
+    let bs, byPer = false;
+    const pers = s.periods.filter(p => p.start <= today && p.end >= from).sort((x, y) => x.start.localeCompare(y.start));
+    if (UI.statsMode === '3' && pers.length >= 2) byPer = true;
+    if (byPer) bs = pers.map(p => ({ key: p.id, lbl: shortDate(p.start).replace('.', ''), items: itemsIn(p).filter(i => dayOfItem(i) >= from), th: p.start >= from ? p.amount : null }));
+    else { bs = []; for (let k = firstMk; k <= cm; k = addMonths(k, 1)) bs.push({ key: k, lbl: monthTick(k), items: itemsOf(k), th: null }); }
+    const items = bs.flatMap(b => b.items);
+    const lbl = UI.statsMode === 'all' ? 'Depuis le début' : `${n} derniers mois`;
+    return { mode: 'range', title: lbl, sub: `${shortDate(from, from.slice(0, 4) !== today.slice(0, 4))} – aujourd'hui · par ${byPer ? 'période' : 'mois'}`, prev: false, next: false, buckets: bs, items, sel: -1,
+      days: Math.max(1, daysBetween(from, today) + 1), incFrom: from, incTo: today, word: 'sur cette plage', unit: byPer ? 'période' : 'mois' };
+  }
   if (UI.statsMode === 'period') {
     const pers = s.periods.filter(p => p.start <= today && p.end >= start).sort((x, y) => x.start.localeCompare(y.start));
     if (pers.length) {
@@ -2245,30 +2264,31 @@ function statsBuckets() {
       if (i < 0) { const a = activePeriod(); i = a ? pers.findIndex(p => p.id === a.id) : -1; if (i < 0) i = pers.length - 1; UI.statsPer = pers[i].id; }
       const sel = pers[i], from = sel.start < start ? start : sel.start, to = sel.end > today ? today : sel.end;
       const bs = pers.slice(Math.max(0, i - 5), i + 1).map(p => ({ key: p.id, lbl: shortDate(p.start).replace('.', ''), items: itemsIn(p), th: p.amount }));
-      return { mode: 'period', title: `${shortDate(sel.start)} – ${shortDate(sel.end)}`, sub: sel.start <= today && today <= sel.end ? 'Période en cours' : 'Période de paie',
+      return { mode: 'period', unit: 'période', title: `${shortDate(sel.start)} – ${shortDate(sel.end)}`, sub: sel.start <= today && today <= sel.end ? 'Période en cours' : 'Période de paie',
         prev: i > 0, next: i < pers.length - 1, buckets: bs, days: Math.max(1, daysBetween(from, to) + 1), incFrom: sel.start, incTo: sel.end, word: 'cette période' };
     }
     UI.statsMode = 'month';
   }
-  const startMk = start.slice(0, 7);
   if (UI.statsMonth < startMk) UI.statsMonth = startMk;
   if (UI.statsMonth > curMonth()) UI.statsMonth = curMonth();
   const mk = UI.statsMonth, isCur = mk === curMonth();
   const mFirst = mk + '-01', mLast = isoOf(new Date(parseMonth(mk).getFullYear(), parseMonth(mk).getMonth() + 1, 0));
   const ks = []; for (let i = 5; i >= 0; i--) { const k = addMonths(mk, -i); if (k >= startMk) ks.push(k); }
-  return { mode: 'month', title: cap(monthLabel(mk)), sub: isCur ? 'Mois en cours' : 'Mois civil', prev: mk > startMk, next: !isCur,
+  return { mode: 'month', unit: 'mois', title: cap(monthLabel(mk)), sub: isCur ? 'Mois en cours' : 'Mois civil', prev: mk > startMk, next: !isCur,
     buckets: ks.map(k => ({ key: k, lbl: parseMonth(k).toLocaleDateString('fr-CA', { month: 'short' }).replace('.', ''), items: itemsOf(k), th: null })),
     days: Math.max(1, daysBetween(start > mFirst ? start : mFirst, isCur ? todayISO() : mLast) + 1), incFrom: mFirst, incTo: mLast, word: 'ce mois' };
 }
-function statsChart(bs, pick, pct) {
-  const W = 340, H = 196, padB = 36, padT = 16, n = bs.length, slots = Math.max(n, 3), bw = 34, gap = (W - 8 - bw * 6) / 5;
+function statsChart(bs, pick, pct, sel) {
+  const W = 340, H = 196, padB = 36, padT = 16, n = bs.length, slots = Math.max(n, 3);
+  const pitch = Math.min((W - 8) / 6, (W - 8) / slots), bw = Math.min(34, pitch * .62), gap = pitch - bw;
   const padL = (W - (slots * bw + (slots - 1) * gap)) / 2, cx = (i) => padL + i * (bw + gap) + bw / 2, base = H - padB;
-  const tots = bs.map(b => sumC(b.items)), sel = n - 1;
+  const step = Math.ceil(n / 7), shown = (i) => (n - 1 - i) % step === 0;
+  const tots = bs.map(b => sumC(b.items));
   const byCat = bs.map(b => { const o = {}; for (const it of b.items) o[it.cat] = (o[it.cat] || 0) + it.amt; return o; });
   const val = (i, c) => { const v = byCat[i][c] || 0; return pct ? (tots[i] ? v / tots[i] : 0) : v; };
   const maxV = pct ? 1 : Math.max(1, ...tots, ...bs.map(b => b.th || 0)) * 1.1;
   const y = (v) => padT + (base - padT) * (1 - v / maxV);
-  let g = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${pct ? 'Part de chaque catégorie' : 'Total des dépenses'} sur les ${n} dernières ${bs.length && UI.statsMode === 'period' ? 'périodes' : 'mois'}">`;
+  let g = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${pct ? 'Part de chaque catégorie' : 'Total des dépenses'}, ${n} barres">`;
   g += `<line x1="0" x2="${W}" y1="${base}" y2="${base}" stroke="var(--line)" stroke-width="1"/>`;
   if (pct) for (const q of [.25, .5, .75]) g += `<line x1="0" x2="${W}" y1="${y(q)}" y2="${y(q)}" stroke="var(--line)" stroke-width="1" stroke-dasharray="2 3"/>`;
   const order = Object.entries(bs.reduce((o, b, i) => { for (const [c, v] of Object.entries(byCat[i])) o[c] = (o[c] || 0) + v; return o; }, {})).sort((p, q) => q[1] - p[1]).map(x => x[0]);
@@ -2278,31 +2298,32 @@ function statsChart(bs, pick, pct) {
       // 100 % stacked bar: every category in its colour, the unchecked ones faded when something is checked
       let acc = 0;
       if (v > 0) for (const c of order) { const f = (byCat[i][c] || 0) / v; if (!f) continue;
-        g += `<rect x="${x}" y="${y(acc + f)}" width="${bw}" height="${Math.max(0, y(acc) - y(acc + f))}" fill="${esc(catById(c).color)}" opacity="${pick.length ? (pick.includes(c) ? .9 : .16) : (cur ? .9 : .55)}"/>`; acc += f; }
+        g += `<rect x="${x}" y="${y(acc + f)}" width="${bw}" height="${Math.max(0, y(acc) - y(acc + f))}" fill="${esc(catById(c).color)}" opacity="${pick.length ? (pick.includes(c) ? .9 : .16) : (cur || sel < 0 ? .9 : .55)}"/>`; acc += f; }
     } else {
       const over = b.th && v > b.th;
-      const fill = cur ? 'var(--accent)' : over && !pick.length ? 'var(--bad)' : 'var(--muted)', op = pick.length ? (cur ? .35 : .22) : cur ? 1 : over ? .55 : .3;
-      if (v > 0) g += `<rect x="${x}" y="${y(v)}" width="${bw}" height="${base - y(v)}" rx="4" fill="${fill}" opacity="${op}"/>`;
+      const fill = cur || sel < 0 ? 'var(--accent)' : over && !pick.length ? 'var(--bad)' : 'var(--muted)', op = pick.length ? (cur ? .35 : .22) : cur ? 1 : sel < 0 ? .75 : over ? .55 : .3;
+      if (v > 0) g += `<rect x="${x}" y="${y(v)}" width="${bw}" height="${base - y(v)}" rx="${Math.min(4, bw / 4)}" fill="${fill}" opacity="${op}"/>`;
       if (b.th) g += `<line x1="${x - 4}" x2="${x + bw + 4}" y1="${y(b.th)}" y2="${y(b.th)}" stroke="var(--fg)" stroke-width="1.5" stroke-dasharray="3 2" opacity=".5"/>`;
     }
     const st = cur ? 'fill:var(--fg);font-weight:600' : '';
     const sub = pct ? (pick.length ? Math.round(pick.reduce((a, c) => a + val(i, c), 0) * 100) + '%' : (v ? '100%' : '–')) : (v ? Math.round(v / 100) : '–');
-    g += `<text x="${cx(i)}" y="${H - 21}" text-anchor="middle" style="${st}">${esc(b.lbl)}</text><text x="${cx(i)}" y="${H - 6}" text-anchor="middle" style="${st}">${sub}</text>`;
+    if (shown(i)) g += `<text x="${cx(i)}" y="${H - 21}" text-anchor="middle" style="${st}">${esc(b.lbl)}</text><text x="${cx(i)}" y="${H - 6}" text-anchor="middle" style="${st}">${sub}</text>`;
   });
   // one curve per checked category
   for (const c of pick) {
     const col = esc(catById(c).color), pts = bs.map((b, i) => [cx(i), y(val(i, c))]);
     if (pts.length > 1) g += `<polyline points="${pts.map(p => p.map(z => z.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="var(--surface)" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/><polyline points="${pts.map(p => p.map(z => z.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="${col}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>`;
-    pts.forEach((p, i) => { g += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i === sel ? 5 : 3.5}" fill="${col}" stroke="var(--surface)" stroke-width="2"/>`; });
+    pts.forEach((p, i) => { g += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i === sel ? 5 : n > 12 ? 2.5 : 3.5}" fill="${col}" stroke="var(--surface)" stroke-width="2"/>`; });
   }
   return g + '</svg>';
 }
 function renderStats() {
   const S0 = S.settings, start = trackingStart();
-  UI.statsMode = UI.statsMode || (activePeriod() ? 'period' : 'month');
+  UI.statsMode = UI.statsMode || 'period';
   UI.statsCats = (UI.statsCats || []).filter(c => S0.cats.some(x => x.id === c));
   const B = statsBuckets(), pick = UI.statsCats, pct = !!UI.statsPct;
-  const all = B.buckets[B.buckets.length - 1].items.slice().sort((a, b) => b.ts.localeCompare(a.ts));
+  const range = B.mode === 'range', sel = range ? -1 : B.buckets.length - 1;
+  const all = (range ? B.items : B.buckets[sel].items).slice().sort((a, b) => b.ts.localeCompare(a.ts));
   const items = pick.length ? all.filter(i => pick.includes(i.cat)) : all;
   const incs = S0.incomes.filter(i => { const d = dayOfItem(i); return d >= B.incFrom && d <= B.incTo; }).sort((a, b) => b.ts.localeCompare(a.ts));
   const total = sumC(all), homeC = sumC(all.filter(i => i.home)), daysCounted = B.days;
@@ -2319,21 +2340,21 @@ function renderStats() {
     return `<div class="catrow"><span class="n"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:${esc(c.color)}"></span>${esc(c.name)}</span><span class="num" style="font-weight:650">${money(v)} <span class="muted" style="font-weight:500">· ${total ? PCT.format(v / total) : ''}</span></span>
       <span class="bar"><i style="width:${(v / scale) * 100}%;background:${esc(c.color)}"></i>${c.limit && B.mode === 'month' ? `<b style="left:calc(${(c.limit / scale) * 100}% - 1px)"></b>` : ''}</span>${lim}</div>`;
   }).join('');
-  const unit = B.mode === 'period' ? 'période' : 'mois';
+  const unit = B.unit;
   $('#v-stats').innerHTML = `
-    <div class="seg st-mode"><button data-act="stats-mode" data-m="period" aria-pressed="${B.mode === 'period'}">Période</button><button data-act="stats-mode" data-m="month" aria-pressed="${B.mode === 'month'}">Mois</button></div>
-    <div class="month-nav"><button data-act="month" data-d="-1" aria-label="${B.mode === 'period' ? 'Période précédente' : 'Mois précédent'}" ${B.prev ? '' : 'disabled'}>‹</button><div class="mn-t"><h1>${esc(B.title)}</h1><span>${esc(B.sub)}</span></div><button data-act="month" data-d="1" aria-label="${B.mode === 'period' ? 'Période suivante' : 'Mois suivant'}" ${B.next ? '' : 'disabled'}>›</button></div>
+    <div class="seg st-mode">${ST_RANGES.map(([k, l]) => `<button data-act="stats-mode" data-m="${k}" aria-pressed="${UI.statsMode === k}">${l}</button>`).join('')}</div>
+    <div class="month-nav${range ? ' range' : ''}">${range ? '' : `<button data-act="month" data-d="-1" aria-label="${B.mode === 'period' ? 'Période précédente' : 'Mois précédent'}" ${B.prev ? '' : 'disabled'}>‹</button>`}<div class="mn-t"><h1>${esc(B.title)}</h1><span>${esc(B.sub)}</span></div>${range ? '' : `<button data-act="month" data-d="1" aria-label="${B.mode === 'period' ? 'Période suivante' : 'Mois suivant'}" ${B.next ? '' : 'disabled'}>›</button>`}</div>
     ${chips ? `<div class="chips st-cats">${chips}</div>` : ''}
     <div class="card hero">
       <div class="kv">
         <div><span class="k">Total</span><span class="v num">${money0(total)}</span></div>
-        <div><span class="k">Par jour</span><span class="v num">${money0(total / daysCounted)}</span></div>
+        ${range ? `<div><span class="k">Par mois</span><span class="v num">${money0(total / daysCounted * 30.44)}</span></div>` : `<div><span class="k">Par jour</span><span class="v num">${money0(total / daysCounted)}</span></div>`}
         <div><span class="k">Dépenses</span><span class="v num">${all.length}</span></div>
       </div>
     </div>
     <div class="card">
       <div class="st-head"><h2>${pct ? 'Part des catégories' : 'Total des dépenses'}</h2><div class="seg st-unit"><button data-act="stats-pct" data-v="0" aria-pressed="${!pct}">$</button><button data-act="stats-pct" data-v="1" aria-pressed="${pct}">%</button></div></div>
-      ${statsChart(B.buckets, pick, pct)}
+      ${statsChart(B.buckets, pick, pct, sel)}
       ${legend ? `<div class="st-legend">${legend}</div>` : ''}
       <div class="note">${pct ? `Chaque barre = 100 % des dépenses de la ${unit}, une couleur par catégorie (pointillés : 25, 50, 75 %).` : `Barres : total par ${unit === 'période' ? 'période de paie (pointillé : ton seuil)' : 'mois civil'}.`} ${pick.length ? 'Courbes : les catégories cochées.' : 'Coche une catégorie en haut pour voir sa courbe.'}</div>
     </div>
@@ -2341,7 +2362,7 @@ function renderStats() {
     <div class="card peach">
       <h2 style="color:var(--home)">Faisable à la maison</h2>
       <div class="kv">
-        <div><span class="k">${B.mode === 'period' ? 'Cette période' : 'Ce mois'}</span><span class="v num" style="color:var(--home)">${money0(homeC)}</span></div>
+        <div><span class="k">${range ? 'Sur la plage' : B.mode === 'period' ? 'Cette période' : 'Ce mois'}</span><span class="v num" style="color:var(--home)">${money0(homeC)}</span></div>
         <div><span class="k">Part</span><span class="v num">${total ? PCT.format(homeC / total) : '—'}</span></div>
         <div><span class="k">Sur 12 mois</span><span class="v num">${money0(homeC / daysCounted * 365)}</span></div>
       </div>
@@ -2704,7 +2725,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.35.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.36.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -3279,7 +3300,7 @@ document.addEventListener('click', (e) => {
       else UI.statsMonth = addMonths(UI.statsMonth, d);
       renderStats(); break;
     }
-    case 'stats-mode': UI.statsMode = t.dataset.m; renderStats(); break;
+    case 'stats-mode': UI.statsMode = t.dataset.m; buzz('tile'); renderStats(); break;
     case 'stats-pct': UI.statsPct = t.dataset.v === '1'; renderStats(); break;
     case 'stats-cat': { const c = t.dataset.cat, l = UI.statsCats || []; UI.statsCats = l.includes(c) ? l.filter(x => x !== c) : l.concat(c); buzz('tile'); renderStats(); break; }
     case 'stats-now': { const a = activePeriod(); UI.statsMode = 'period'; UI.statsPer = a ? a.id : null; showTab('stats'); break; }
