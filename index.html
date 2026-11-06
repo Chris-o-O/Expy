@@ -1389,12 +1389,19 @@ function payShares(h) {
 const partVals = (h, spend) => { const ps = payShares(h); return { debt: h.rs.debt + ps.debt, wish: h.rs.wish, save: h.rs.save + ps.save, spend }; };
 const dialScale = (h) => { const ps = payShares(h); return h.amount + h.inc + ps.debt + ps.save; };
 const PARTS = [['debt', 'Dettes', 'var(--c-debt)'], ['wish', 'Souhaits', 'var(--c-wish)'], ['save', 'Épargne', 'var(--c-save)'], ['spend', 'Dépenses', 'var(--c-spend)']];
+/* v1.39: a checked part is drawn in its pastel; an unchecked part leaves the ring, which then only covers the
+   checked parts + what is left (uncheck Dettes → spending over the budget you can spend). Spending always
+   stays (black when unchecked). Nothing checked = the whole period in black, as before. */
 function dialParts(h, view) {
-  const A = dialScale(h), show = S.settings.ringShow, rs = h.rs;
+  const show = S.settings.ringShow, val = partVals(h, view);
   const hot = h.left < 0 ? 'var(--bad)' : (h.free > 0 && h.spent >= .8 * h.free) ? 'var(--c-hot)' : 'var(--fg)';
-  const val = partVals(h, view), before = val.debt + val.wish + val.save;
+  const any = PARTS.some(([k]) => show[k] && val[k] > 0);
+  const keep = (k) => k === 'spend' || !any || show[k];
+  const before = PARTS.reduce((t, [k]) => t + (k !== 'spend' && keep(k) ? Math.max(0, val[k]) : 0), 0);
+  const left = h.left + (view === h.spent ? 0 : h.spent - view);
+  const A = any ? Math.max(1, before + Math.max(0, val.spend) + Math.max(0, left)) : dialScale(h);
   let a = 0; const out = [];
-  for (const [k, , col] of PARTS) { const l = Math.min(Math.max(0, val[k]) / A, 1 - a); out.push({ k, a, l, col: show[k] ? col : hot }); a += l; }
+  for (const [k, , col] of PARTS) { const l = keep(k) ? Math.min(Math.max(0, val[k]) / A, 1 - a) : 0; out.push({ k, a, l, col: show[k] ? col : hot }); a += l; }
   return { A, parts: out, end: a, before, pace: h.free > 0 ? Math.min(1, (before + h.free * (h.elapsed - 0.5) / h.len) / A) : null };
 }
 // Point on the dial where spending now ends (ring head, or the bar when the keyboard is up).
@@ -2728,7 +2735,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.38.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.39.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -3433,7 +3440,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) rere
   const show = (anchor) => {
     const h = UI.hs; if (!h || !h.per || h.pace == null) return;
     const d = h.pace - h.spent, r = (anchor || $('#dial')).getBoundingClientRect();
-    bubble.innerHTML = `<b>Rythme : ${money0(h.pace)} aujourd'hui</b>${Math.abs(d) < 100 ? 'Tu es pile dans le rythme.' : d > 0 ? `Tu as ${money0(d)} d'avance sur le rythme.` : `Tu dépenses ${money0(-d)} plus vite que le rythme.`}<br><span style="opacity:.75;font-weight:600">Le trait bleu : ce que tu aurais dépensé en répartissant ${money0(h.free)} également sur ${h.len} jours.</span>`;
+    bubble.innerHTML = `<b>Prévu à ce jour : ${money0(h.pace)}</b>Tu as dépensé ${money0(h.spent)}${Math.abs(d) < 100 ? ', pile dans le plan.' : d > 0 ? `, soit <strong style="font-weight:800">${money0(d)} de moins</strong>.` : `, soit <strong style="font-weight:800">${money0(-d)} de plus</strong>.`}<br><span style="opacity:.75;font-weight:600">Le trait bleu avance chaque jour : ${money0(h.free)} répartis sur ${h.len} jours.</span>`;
     bubble.style.left = (r.left + r.width / 2) + 'px'; bubble.style.top = (anchor ? r.top - bubble.offsetHeight / 2 - 10 : r.top + r.height / 2) + 'px';
     bubble.hidden = false; buzz('tile'); UI.paceShown = Date.now();
     if (anchor) bubble.style.top = (r.top - bubble.offsetHeight / 2 - 10) + 'px';
