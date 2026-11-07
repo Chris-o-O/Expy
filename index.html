@@ -872,6 +872,7 @@ function applyCache(c) {
 let saveFailed = false;
 function saveCache() {
   const ok = lsSet(LS_KEY, JSON.stringify({ v: 2, settings: S.settings, months: S.months }));
+  if (ok) lsSet('bex1:dirty', String(Date.now()));
   if (!ok && !saveFailed) { saveFailed = true; setTimeout(() => toast("L'enregistrement sur ce téléphone a échoué. Exporte une sauvegarde dans Réglages."), 50); }
   if (ok) saveFailed = false;
 }
@@ -891,7 +892,7 @@ const mKey = (mk) => 'm-' + mk;
 /* Android app (Capacitor, v1.22): the same code runs inside the APK. What a WebView cannot do
    (download files, the share sheet, vibrations) goes through Capacitor's native plugins. */
 const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-const NP = NATIVE ? Object.fromEntries(['Filesystem', 'Share', 'Haptics', 'App', 'PayNotif'].map(n => [n, window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin(n) : window.Capacitor.Plugins[n]])) : null;
+const NP = NATIVE ? Object.fromEntries(['Filesystem', 'Share', 'Haptics', 'App', 'PayNotif', 'DriveBackup'].map(n => [n, window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin(n) : window.Capacitor.Plugins[n]])) : null;
 // File export: a normal browser download (or the share sheet when the browser offers it for files).
 // In the app: the file is written to the cache and handed to Android's share sheet (Drive, Files…).
 S.dl = NATIVE ? {
@@ -1606,7 +1607,7 @@ function envelopeGap() {
 }
 // v1.28: each notice is one line; touching it does the main action, × puts it off when that is possible.
 function bline(text, act, opt = {}) {
-  return `<div class="bline${opt.tone ? ' ' + opt.tone : ''}"><button class="bl-main" data-act="${act}"${opt.id ? ` data-id="${esc(opt.id)}"` : ''}><i></i><span>${text}</span><b>›</b></button>${opt.later ? `<button class="bl-x" data-act="${opt.later}" aria-label="Plus tard">×</button>` : ''}</div>`;
+  return `<div class="bline${opt.tone ? ' ' + opt.tone : ''}"><button class="bl-main" data-act="${act}"${opt.id ? ` data-id="${esc(opt.id)}"` : ''}${opt.s ? ` data-s="${esc(opt.s)}"` : ''}><i></i><span>${text}</span><b>›</b></button>${opt.later ? `<button class="bl-x" data-act="${opt.later}" aria-label="Plus tard">×</button>` : ''}</div>`;
 }
 function renderBanners() {
   const out = [];
@@ -1631,7 +1632,10 @@ function renderBanners() {
   if (real.length) {
     const last = S.settings.lastExport ? new Date(S.settings.lastExport).getTime() : 0;
     const first = Math.min(...real.map(i => new Date(i.ts).getTime()));
-    if (Date.now() - last > 30 * 864e5 && Date.now() - first > 7 * 864e5) out.push(bline('Exporte une sauvegarde ce mois-ci', 'export-json', { tone: 'warn' }));
+    const drv = NATIVE && DRV.st && DRV.st.linked;
+    if (NATIVE && DRV.st && DRV.err === 'unlinked') out.push(bline('La sauvegarde Drive est interrompue : choisis le fichier', 'open-set', { tone: 'warn', s: 'donnees' }));
+    else if (drv && Date.now() - driveAt() > 3 * 864e5 && DRV.err) out.push(bline('Sauvegarde Drive en échec depuis quelques jours', 'open-set', { tone: 'warn', s: 'donnees' }));
+    else if (!(drv && Date.now() - driveAt() < 30 * 864e5) && Date.now() - last > 30 * 864e5 && Date.now() - first > 7 * 864e5) out.push(bline(NATIVE ? 'Active la sauvegarde automatique dans Drive' : 'Exporte une sauvegarde ce mois-ci', NATIVE ? 'open-set' : 'export-json', { tone: 'warn', s: 'donnees' }));
   }
   $('#banners').innerHTML = out.join('');
 }
@@ -2655,6 +2659,22 @@ const SET_SECS = [
 ];
 const initials = (n) => (n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
 const avatar = (name, size) => `<span class="av${size ? ' ' + size : ''}" aria-hidden="true">${esc(initials(name)) || '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>'}</span>`;
+function driveCard() {
+  const st = DRV.st, at = driveAt();
+  if (st && st.linked && lsGet('bex1:driveHold')) UI.driveAsk = true;
+  const when = at ? new Date(at).toLocaleString('fr-CA', { day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }) : null;
+  if (UI.driveAsk && st && st.linked) return `<div class="card"><h2>Sauvegarde automatique</h2>
+    <div class="note">Expy va remplacer le contenu de « ${esc(st.name || 'ce fichier')} » par les données de ce téléphone. Si ce fichier est ta sauvegarde de l'ancien téléphone, restaure-la d'abord avec « Restaurer une sauvegarde » ci-dessous.</div>
+    <div class="btn-row"><button class="btn" data-act="drive-ok">Remplacer le fichier</button><button class="btn ghost" data-act="drive-stop">Annuler</button></div></div>`;
+  if (st && st.linked) return `<div class="card"><h2>Sauvegarde automatique</h2>
+    <div class="note"><b>Active</b> · ${esc(st.name || 'fichier choisi')}${when ? ` · dernière : ${esc(when)}` : ''}${driveDirty() ? ' · modifications à sauvegarder' : ''}</div>
+    ${DRV.err ? `<div class="warntext">${DRV.err === 'unlinked' ? "Le fichier n'est plus accessible." : "Dernière tentative en échec (hors ligne ?)."}</div>` : ''}
+    <div class="note">Expy réécrit ce fichier quand tu quittes l'app après un changement. Il contient toutes tes données : garde-le privé dans ton Drive.</div>
+    <div class="btn-row"><button class="btn" data-act="drive-now">Sauvegarder maintenant</button><button class="btn ghost" data-act="drive-stop">Arrêter</button></div></div>`;
+  return `<div class="card"><h2>Sauvegarde automatique</h2>
+    <div class="note">${DRV.err === 'unlinked' ? "Le fichier de sauvegarde n'est plus accessible. " : ''}Choisis un emplacement, par exemple Google Drive : Expy y garde une copie à jour de tes données et la réécrit chaque fois que tu quittes l'app après un changement. Pas de compte à créer.</div>
+    <div class="btn-row"><button class="btn" data-act="drive-new">Choisir où sauvegarder</button><button class="btn ghost" data-act="drive-existing">Utiliser un fichier existant</button></div></div>`;
+}
 function renderSettings() {
   const s = S.settings;
   const periods = s.periods.slice().sort((a, b) => b.start.localeCompare(a.start));
@@ -2673,7 +2693,7 @@ function renderSettings() {
     </div>`).join('');
   const status = 'Tes données restent sur ce téléphone, sans compte ni synchronisation.'
     + (S.persisted === true ? ' Stockage protégé : Chrome ne les effacera pas pour libérer de l\'espace.' : S.persisted === false ? ' Chrome n\'a pas encore protégé le stockage ; installer l\'app aide.' : '')
-    + ' Exporte une sauvegarde chaque mois, et avant de changer de téléphone ou de vider les données de Chrome.';
+    + (NATIVE ? ' Pour changer de téléphone : active la sauvegarde automatique ci-dessus, ou exporte une sauvegarde complète.' : ' Exporte une sauvegarde chaque mois, et avant de changer de téléphone ou de vider les données de Chrome.');
   const hasEx = allItems().some(i => i.ex) || s.debts.some(d => d.ex) || s.wishes.some(w => w.ex) || s.goals.some(g => g.ex);
   // v1.18: settings open from the name pill on the dashboard; categories on the left, items on the right.
   const sec = {
@@ -2700,7 +2720,7 @@ function renderSettings() {
       </div>
       <div class="note">Appareil : touche le montant pour ouvrir le clavier numérique du téléphone. Le pavé intégré ne s'affiche que si le clavier de l'appareil ne s'ouvre pas.</div>
     </div>`,
-    donnees: `    <div class="card"><h2>Données</h2><div class="note">${esc(status)}</div>
+    donnees: (NATIVE && NP.DriveBackup ? driveCard() : '') + `    <div class="card"><h2>Données</h2><div class="note">${esc(status)}</div>
       <div class="btn-row">
         ${S.dl ? `<button class="btn ghost" data-act="export-csv">Exporter CSV</button><button class="btn ghost" data-act="export-json">Sauvegarde complète</button>` : '<span class="note">L\'export de fichiers n\'est pas offert dans cette vue.</span>'}
         <button class="btn ghost" data-act="import">Restaurer une sauvegarde</button>
@@ -2735,7 +2755,7 @@ function renderSettings() {
     <div class="set-wrap">
       <nav class="set-rail" aria-label="Catégories de réglages">${SET_SECS.map(([k, l, ic]) => `<button data-act="set-sec" data-s="${k}" ${k === cur ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${l}</button>`).join('')}</nav>
       <div class="set-body">${sec[cur]}
-        <p class="note" style="text-align:center">Expy · version 1.39.0${NATIVE ? ' · app Android' : ''}</p></div>
+        <p class="note" style="text-align:center">Expy · version 1.40.0${NATIVE ? ' · app Android' : ''}</p></div>
     </div>`;
 }
 
@@ -3115,8 +3135,54 @@ function exportCSV() {
   });
   save(`depenses-${todayISO()}.csv`, '﻿' + rows.map(r => r.map(csvCell).join(';')).join('\r\n'));
 }
-function exportJSON() {
-  save(`budget-sauvegarde-${todayISO()}.json`, JSON.stringify({ app: 'budget-perso-express', v: 1, exported: new Date().toISOString(), settings: S.settings, months: S.months }, null, 1));
+const backupJSON = () => JSON.stringify({ app: 'budget-perso-express', v: 1, exported: new Date().toISOString(), settings: S.settings, months: S.months }, null, 1);
+function exportJSON() { save(`budget-sauvegarde-${todayISO()}.json`, backupJSON()); }
+
+/* v1.40: automatic backup to a file the user picked once (Android's file picker: Google Drive, Files…).
+   Expy keeps the permission to that file and rewrites it when the app goes to the background after a change.
+   No Google account or key is involved; restoring on a new phone = « Restaurer une sauvegarde » on that file. */
+const DRV = { st: null, busy: false, err: null, last: 0 };
+const driveAt = () => Number(lsGet('bex1:driveAt')) || 0;
+const driveDirty = () => (Number(lsGet('bex1:dirty')) || 0) > driveAt();
+async function driveStatus() {
+  if (!NATIVE || !NP.DriveBackup) return null;
+  try { DRV.st = await NP.DriveBackup.status(); } catch (e) { DRV.st = null; }
+  return DRV.st;
+}
+async function driveSave(manual) {
+  if (!NATIVE || !NP.DriveBackup || DRV.busy) return false;
+  if (!DRV.st) await driveStatus();
+  if (!DRV.st || !DRV.st.linked) return false;
+  if (!manual && (lsGet('bex1:driveHold') || !driveDirty() || Date.now() - DRV.last < 2 * 60e3)) return false;
+  DRV.busy = true; DRV.last = Date.now();
+  const stamp = Date.now();
+  try {
+    await NP.DriveBackup.write({ data: backupJSON() });
+    lsSet('bex1:driveAt', String(stamp)); DRV.err = null;
+    if (manual) toast('Sauvegarde enregistrée dans Drive');
+  } catch (e) {
+    DRV.err = e && e.code === 'unlinked' ? 'unlinked' : 'write';
+    if (DRV.err === 'unlinked') DRV.st = { linked: false };
+    if (manual) toast(DRV.err === 'unlinked' ? "Le fichier n'est plus accessible. Choisis-le à nouveau." : "La sauvegarde n'a pas pu s'écrire (hors ligne ?). Réessaie.");
+  }
+  DRV.busy = false;
+  if (UI.tab === 'home') renderBanners(); if (UI.tab === 'settings') renderSettings();
+  return !DRV.err;
+}
+async function driveLink(existing) {
+  try {
+    DRV.st = await NP.DriveBackup.pick({ existing: !!existing, title: 'expy-sauvegarde.json' });
+    if (existing) {
+      // An existing file is overwritten: say so, and keep it only when the person agrees.
+      lsSet('bex1:driveHold', '1'); UI.driveAsk = true; renderSettings(); return;
+    }
+    await driveSave(true);
+  } catch (e) { if (!(e && e.code === 'cancelled')) toast("Impossible d'utiliser ce fichier."); }
+  renderSettings();
+}
+if (NATIVE && NP.DriveBackup) {
+  NP.App.addListener('appStateChange', (st) => { if (st && st.isActive === false) driveSave(false); });
+  setTimeout(() => driveStatus().then(() => driveSave(false)), 1500);
 }
 $('#importIn').addEventListener('change', async (e) => {
   const file = e.target.files && e.target.files[0]; e.target.value = '';
@@ -3380,6 +3446,11 @@ document.addEventListener('click', (e) => {
     }
     case 'export-csv': exportCSV(); break;
     case 'export-json': exportJSON(); break;
+    case 'drive-new': driveLink(false); break;
+    case 'drive-existing': driveLink(true); break;
+    case 'drive-ok': UI.driveAsk = false; try { localStorage.removeItem('bex1:driveHold'); } catch (e) { } driveSave(true).then(renderSettings); break;
+    case 'drive-now': driveSave(true); break;
+    case 'drive-stop': UI.driveAsk = false; try { localStorage.removeItem('bex1:driveHold'); } catch (e) { } NP.DriveBackup.unlink().then(r => { DRV.st = r; DRV.err = null; lsSet('bex1:driveAt', '0'); renderSettings(); }).catch(() => renderSettings()); break;
     case 'import': $('#importIn').click(); break;
     case 'load-demo': loadDemo(); break;
     case 'clear-demo': clearDemo(); break;
@@ -3668,7 +3739,7 @@ if (!S.settings.profile && !S.settings.profileSkip && !allItems().length && !S.s
 window.addEventListener('hashchange', () => { if (HASH_TABS[location.hash]) showTab(HASH_TABS[location.hash]); });
 connect().then(() => { resetEntry(); rerender(); });
 
-window.__budget = { addIncome, addExpense, fixedMatch, sheetDetected, removeIncome, projection, confidence, sheetReview, payPeriodAt, saveReco, renderDash, renderGoals, reserveFor, startNative, endNative, homeState, simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
+window.__budget = { renderSettings, addIncome, addExpense, fixedMatch, sheetDetected, removeIncome, projection, confidence, sheetReview, payPeriodAt, saveReco, renderDash, renderGoals, reserveFor, startNative, endNative, homeState, simulate, monthsClosedForm, S, UI, normalize, rollPeriods, nextPeriod, activePeriod, trackingStart, savingRate, wishPlan, persist, rerender, debtSim, autoLeftover, pendingReview };
 })();
 </script>
 </body>
